@@ -10,13 +10,17 @@
 ## Features
 
 - **Priority-based Organization** - Customizable priority levels with drag and drop
-- **Stunning Backgrounds** - 5 animated themes (Starfall, Star Wars, Summer, Aurora, Ocean)
+- **8 Animated Themes** - Starfall, Hyperspace, AT-AT Walker, Sunset, Stars, Aurora, Ocean
 - **Cloud Sync** - Automatic backup to Cloudflare D1 database
 - **Token Recovery** - Unique XXX-XXX-XXX token for data restoration
 - **QR Code Export** - Share your recovery token easily
 - **Email Backup** - Send recovery token to your email
 - **Keyboard Accessible** - Full keyboard navigation support
 - **Mobile Responsive** - Works beautifully on all devices
+
+## Live Demo
+
+**[prioritiz.pages.dev](https://prioritiz.pages.dev)**
 
 ## Quick Start
 
@@ -30,7 +34,7 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/prioritiz.git
+git clone https://github.com/screamm/prioritiz.git
 cd prioritiz
 
 # Install dependencies
@@ -53,7 +57,6 @@ Visit `http://localhost:5173` to see the app.
 - **Framer Motion** - Animations
 - **dnd-kit** - Drag and drop
 - **Zustand** - State management
-- **tsParticles** - Particle effects
 
 ### Backend
 
@@ -69,6 +72,7 @@ prioritiz/
 ├── src/
 │   ├── components/       # React components
 │   │   ├── backgrounds/  # Animated background themes
+│   │   ├── dnd/          # Drag and drop provider
 │   │   ├── inbox/        # Inbox component
 │   │   ├── layout/       # Layout components
 │   │   ├── priority/     # Priority management
@@ -86,9 +90,7 @@ prioritiz/
 │       │   ├── routes/   # API routes
 │       │   └── middleware/
 │       └── migrations/   # D1 database migrations
-└── tests/
-    ├── unit/             # Vitest unit tests
-    └── e2e/              # Playwright E2E tests
+└── dist/                 # Production build output
 ```
 
 ## Development
@@ -101,16 +103,9 @@ npm run dev          # Start dev server
 npm run build        # Build for production
 npm run preview      # Preview production build
 
-# Testing
-npm run test         # Run unit tests
-npm run test:ui      # Run tests with UI
-npm run test:coverage # Run tests with coverage
-npm run test:e2e     # Run E2E tests
-
 # Code Quality
 npm run lint         # Run ESLint
 npm run typecheck    # Run TypeScript check
-npm run format       # Format with Prettier
 ```
 
 ### Backend Development
@@ -157,7 +152,6 @@ MAILGUN_DOMAIN=your-domain
 
    ```bash
    wrangler d1 execute prioritiz-db --file=./migrations/0001_initial.sql
-   wrangler d1 execute prioritiz-db --file=./migrations/0002_indexes.sql
    ```
 
 3. Set secrets:
@@ -186,7 +180,7 @@ The app comes with three default priority levels:
 2. **Todo** (yellow) - Normal priority
 3. **Only do in spare time** (green) - Lowest priority
 
-You can customize these levels, add new ones, or remove existing ones to fit your workflow.
+You can customize these levels, add new ones (max 10), or remove existing ones to fit your workflow.
 
 ## Recovery Token
 
@@ -195,7 +189,7 @@ Your unique recovery token uses the format: `XXX-XXX-XXX`
 - Displayed in the settings panel
 - Scannable via QR code for easy sharing
 - Can be emailed to you for safekeeping
-- Use at `/restore/:token` endpoint to recover your data on a new device
+- Enter in Settings to restore your data on a new device
 
 ## Data Storage
 
@@ -208,23 +202,73 @@ Your data is always available locally, with automatic cloud backup when online.
 
 ## Background Themes
 
-Choose from 5 animated background themes:
+Choose from 8 animated background themes:
 
-- **Starfall** - Gentle falling stars animation
-- **Star Wars** - Hyperspace star field effect
-- **Summer** - Warm, floating particles
-- **Aurora** - Northern lights color waves
-- **Ocean** - Calm underwater ambiance
+| Theme | Description |
+|-------|-------------|
+| **Sunset** | Warm sunset gradient with floating particles |
+| **Hyperspace** | Star Wars-style hyperspace jump effect |
+| **AT-AT Walker** | Imperial AT-AT walking on Hoth (CSS animation) |
+| **Starfall** | Gentle falling stars and meteors |
+| **Stars** | Glittering night sky |
+| **Stars 2** | Cosmic star field variation |
+| **Aurora** | Northern lights color waves |
+| **Ocean** | Calm deep underwater ambiance |
+
+## Known Issues & Roadmap
+
+### Critical Priority
+
+| Issue | Description | Status |
+|-------|-------------|--------|
+| Sync Conflict Resolution | Full DELETE then INSERT can cause data loss on simultaneous access | Planned |
+| Database Transactions | Sync operations not wrapped in transactions | Planned |
+| Token Expiration | Tokens never expire, security concern | Planned |
+
+### High Priority
+
+| Issue | Description | Status |
+|-------|-------------|--------|
+| DnD Reordering | Dropping within same priority column sometimes places item at end | Under Review |
+| Offline Detection | No `navigator.onLine` check before sync attempts | Planned |
+| API Timeout | No AbortController timeout on fetch requests | Planned |
+| Silent Sync Failures | User not notified when sync fails | Planned |
+| Race Conditions | Multiple rapid todo moves can corrupt order values | Under Review |
+
+### Medium Priority
+
+| Issue | Description | Status |
+|-------|-------------|--------|
+| Input Validation | Max length not enforced in UI input fields | Planned |
+| Restore Validation | Restored data not validated against schemas | Planned |
+| Re-render Optimization | Todo list re-renders entirely on single change | Planned |
+| Rate Limiting | No rate limit on restore endpoint (brute force) | Planned |
+
+### Planned Features
+
+- [ ] Token expiration with renewal flow
+- [ ] Offline queue with sync-when-online
+- [ ] Conflict resolution UI for sync conflicts
+- [ ] Virtual scrolling for large todo lists
+- [ ] Database indexes for query performance
+- [ ] Comprehensive test suite (Vitest + Playwright)
 
 ## Accessibility
 
 Prioritiz is built with accessibility in mind:
 
 - Full keyboard navigation support
-- Screen reader compatible
-- High contrast color options
+- Screen reader compatible with ARIA labels
 - Focus indicators on all interactive elements
-- ARIA labels and roles throughout
+- Confirmation modals for destructive actions
+- High contrast glassmorphism design
+
+## Browser Support
+
+- Chrome 90+
+- Firefox 88+
+- Safari 14+
+- Edge 90+
 
 ## Contributing
 
@@ -244,6 +288,6 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 - [dnd-kit](https://dndkit.com/) for accessible drag and drop
 - [Framer Motion](https://www.framer.com/motion/) for smooth animations
-- [tsParticles](https://particles.js.org/) for particle effects
 - [Cloudflare](https://cloudflare.com/) for serverless infrastructure
 - [Zustand](https://zustand-demo.pmnd.rs/) for simple state management
+- [r4ms3s](https://codepen.io/r4ms3s/pen/gajVBG) for the AT-AT CSS animation
