@@ -152,29 +152,4 @@ restoreRoute.get('/:token', async (c) => {
   }
 })
 
-// HEAD request for quick existence check
-restoreRoute.head('/:token', async (c) => {
-  const token = c.req.param('token')
-
-  // Validate token format
-  if (!/^[A-Z2-9]{3}-[A-Z2-9]{3}-[A-Z2-9]{3}$/.test(token)) {
-    return c.body(null, 400)
-  }
-
-  try {
-    const user = await c.env.DB.prepare(
-      'SELECT 1 FROM users WHERE token = ?'
-    )
-      .bind(token)
-      .first()
-
-    if (!user) {
-      return c.body(null, 404)
-    }
-
-    return c.body(null, 200)
-  } catch (error) {
-    console.error('Restore check error:', error)
-    return c.body(null, 500)
-  }
-})
+// Note: HEAD requests are automatically handled by GET routes in Hono

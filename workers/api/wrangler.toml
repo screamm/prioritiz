@@ -45,10 +45,6 @@ name = "prioritiz-api-staging"
 ENVIRONMENT = "staging"
 ALLOWED_ORIGINS = "https://staging.prioritiz.pages.dev,http://localhost:5173"
 
-# Build configuration
-[build]
-command = "npm run build"
-
 # Observability
 [observability]
 enabled = true
