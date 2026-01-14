@@ -1,17 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core'
-import {
-  arrayMove,
   SortableContext,
-  sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { motion } from 'framer-motion'
@@ -33,7 +22,7 @@ export function PriorityManager({ className }: PriorityManagerProps) {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [editingPriority, setEditingPriority] = useState<Priority | null>(null)
 
-  const { priorities, addPriority, updatePriority, deletePriority, reorderPriorities, getSortedPriorities } = usePriorityStore()
+  const { priorities, addPriority, updatePriority, deletePriority, getSortedPriorities } = usePriorityStore()
   const { getTodosByPriority } = useTodoStore()
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -45,35 +34,6 @@ export function PriorityManager({ className }: PriorityManagerProps) {
   )
 
   const canAddMore = priorities.length < LIMITS.MAX_PRIORITIES
-
-  // DnD sensors for priority reordering
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  )
-
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      const { active, over } = event
-
-      if (over && active.id !== over.id) {
-        const oldIndex = sortedPriorities.findIndex((p) => p.id === active.id)
-        const newIndex = sortedPriorities.findIndex((p) => p.id === over.id)
-
-        if (oldIndex !== -1 && newIndex !== -1) {
-          const newOrder = arrayMove(sortedPriorities, oldIndex, newIndex)
-          reorderPriorities(newOrder.map((p) => p.id))
-        }
-      }
-    },
-    [sortedPriorities, reorderPriorities]
-  )
 
   const handleAddPriority = useCallback(
     (name: string, color: string) => {
@@ -130,34 +90,29 @@ export function PriorityManager({ className }: PriorityManagerProps) {
   return (
     <div className={cn('flex flex-col gap-4', className)}>
       {/* Priority columns - vertically stacked with drag & drop */}
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
+      {/* SortableContext for priority reordering - DndContext is in DndProvider */}
+      <SortableContext
+        items={sortedPriorities.map((p) => p.id)}
+        strategy={verticalListSortingStrategy}
       >
-        <SortableContext
-          items={sortedPriorities.map((p) => p.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          <div className="flex flex-col gap-4">
-            {sortedPriorities.map((priority, index) => (
-              <motion.div
-                key={priority.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.05 }}
-              >
-                <SortablePriorityColumn
-                  priority={priority}
-                  todos={getTodosByPriority(priority.id)}
-                  onEditPriority={handleEditPriority}
-                  onDeletePriority={handleDeletePriority}
-                />
-              </motion.div>
-            ))}
-          </div>
-        </SortableContext>
-      </DndContext>
+        <div className="flex flex-col gap-4">
+          {sortedPriorities.map((priority, index) => (
+            <motion.div
+              key={priority.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: index * 0.05 }}
+            >
+              <SortablePriorityColumn
+                priority={priority}
+                todos={getTodosByPriority(priority.id)}
+                onEditPriority={handleEditPriority}
+                onDeletePriority={handleDeletePriority}
+              />
+            </motion.div>
+          ))}
+        </div>
+      </SortableContext>
 
       {/* Add priority button */}
       {canAddMore && (
