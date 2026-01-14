@@ -5,6 +5,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Check, Trash2, GripVertical, Pencil } from 'lucide-react'
 import type { Todo } from '@/types'
 import { cn } from '@/utils'
+import { ConfirmModal } from '@/components/ui'
 
 interface TodoItemProps {
   todo: Todo
@@ -21,7 +22,7 @@ export const TodoItem = forwardRef<HTMLDivElement, TodoItemProps>(
   ) {
     const [isEditing, setIsEditing] = useState(false)
     const [editText, setEditText] = useState(todo.text)
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+    const [showDeleteModal, setShowDeleteModal] = useState(false)
     const [isHovered, setIsHovered] = useState(false)
     const inputRef = useRef<HTMLInputElement>(null)
 
@@ -93,14 +94,13 @@ export const TodoItem = forwardRef<HTMLDivElement, TodoItemProps>(
     )
 
     const handleDeleteClick = useCallback(() => {
-      if (showDeleteConfirm) {
-        onDelete(todo.id)
-        setShowDeleteConfirm(false)
-      } else {
-        setShowDeleteConfirm(true)
-        setTimeout(() => setShowDeleteConfirm(false), 3000)
-      }
-    }, [onDelete, todo.id, showDeleteConfirm])
+      setShowDeleteModal(true)
+    }, [])
+
+    const handleConfirmDelete = useCallback(() => {
+      onDelete(todo.id)
+      setShowDeleteModal(false)
+    }, [onDelete, todo.id])
 
     return (
       <motion.div
@@ -124,10 +124,7 @@ export const TodoItem = forwardRef<HTMLDivElement, TodoItemProps>(
           todo.completed && 'opacity-60'
         )}
         onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => {
-          setIsHovered(false)
-          setShowDeleteConfirm(false)
-        }}
+        onMouseLeave={() => setIsHovered(false)}
       >
         {/* Drag Handle */}
         <button
@@ -226,17 +223,27 @@ export const TodoItem = forwardRef<HTMLDivElement, TodoItemProps>(
                 className={cn(
                   'p-1.5 rounded-lg transition-colors duration-200',
                   'focus:outline-none focus:ring-2 focus:ring-red-500/50',
-                  showDeleteConfirm
-                    ? 'text-red-400 bg-red-500/20 hover:bg-red-500/30'
-                    : 'text-white/50 hover:text-red-400 hover:bg-red-500/10'
+                  'text-white/50 hover:text-red-400 hover:bg-red-500/10'
                 )}
-                aria-label={showDeleteConfirm ? 'Bekräfta borttagning' : 'Ta bort uppgift'}
+                aria-label="Ta bort uppgift"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
             </>
           )}
         </div>
+
+        {/* Delete confirmation modal */}
+        <ConfirmModal
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          onConfirm={handleConfirmDelete}
+          title="Ta bort uppgift?"
+          message={`Är du säker på att du vill ta bort "${todo.text}"?`}
+          confirmText="Ta bort"
+          cancelText="Avbryt"
+          variant="danger"
+        />
       </motion.div>
     )
   }

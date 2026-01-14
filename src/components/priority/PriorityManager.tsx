@@ -9,7 +9,7 @@ import { usePriorityStore, useTodoStore } from '@/stores'
 import { SortablePriorityColumn } from './SortablePriorityColumn'
 import { AddPriorityModal } from './AddPriorityModal'
 import { EditPriorityModal } from './EditPriorityModal'
-import { Button } from '@/components/ui'
+import { Button, ConfirmModal } from '@/components/ui'
 import { cn } from '@/utils'
 import { LIMITS } from '@/utils/constants'
 import type { Priority } from '@/types'
@@ -21,6 +21,7 @@ interface PriorityManagerProps {
 export function PriorityManager({ className }: PriorityManagerProps) {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [editingPriority, setEditingPriority] = useState<Priority | null>(null)
+  const [deletingPriority, setDeletingPriority] = useState<Priority | null>(null)
 
   const { priorities, addPriority, updatePriority, deletePriority, getSortedPriorities } = usePriorityStore()
   const { getTodosByPriority } = useTodoStore()
@@ -53,39 +54,37 @@ export function PriorityManager({ className }: PriorityManagerProps) {
     [updatePriority]
   )
 
-  const handleDeletePriority = useCallback(
-    (priority: Priority) => {
-      // Get todos in this priority
-      const todosInPriority = getTodosByPriority(priority.id)
+  const handleDeletePriority = useCallback((priority: Priority) => {
+    setDeletingPriority(priority)
+  }, [])
 
-      if (todosInPriority.length > 0) {
-        // Confirm deletion if there are todos
-        const confirmed = window.confirm(
-          `Är du säker på att du vill ta bort "${priority.name}"? ${todosInPriority.length} uppgift(er) kommer flyttas till Inbox.`
-        )
-        if (!confirmed) {
-          return
-        }
+  const handleConfirmDelete = useCallback(() => {
+    if (!deletingPriority) return
 
-        // Move todos to inbox
-        const { moveTodo } = useTodoStore.getState()
-        todosInPriority.forEach((todo, index) => {
-          moveTodo(todo.id, null, index)
-        })
-      } else {
-        // Confirm deletion even without todos
-        const confirmed = window.confirm(
-          `Är du säker på att du vill ta bort "${priority.name}"?`
-        )
-        if (!confirmed) {
-          return
-        }
-      }
+    // Get todos in this priority
+    const todosInPriority = getTodosByPriority(deletingPriority.id)
 
-      deletePriority(priority.id)
-    },
-    [deletePriority, getTodosByPriority]
-  )
+    if (todosInPriority.length > 0) {
+      // Move todos to inbox
+      const { moveTodo } = useTodoStore.getState()
+      todosInPriority.forEach((todo, index) => {
+        moveTodo(todo.id, null, index)
+      })
+    }
+
+    deletePriority(deletingPriority.id)
+    setDeletingPriority(null)
+  }, [deletingPriority, deletePriority, getTodosByPriority])
+
+  // Calculate message for delete modal
+  const deleteModalMessage = useMemo(() => {
+    if (!deletingPriority) return ''
+    const todosInPriority = getTodosByPriority(deletingPriority.id)
+    if (todosInPriority.length > 0) {
+      return `Är du säker på att du vill ta bort "${deletingPriority.name}"? ${todosInPriority.length} uppgift(er) kommer flyttas till Inbox.`
+    }
+    return `Är du säker på att du vill ta bort "${deletingPriority.name}"?`
+  }, [deletingPriority, getTodosByPriority])
 
   return (
     <div className={cn('flex flex-col gap-4', className)}>
@@ -153,6 +152,18 @@ export function PriorityManager({ className }: PriorityManagerProps) {
         onSave={handleSavePriority}
         priority={editingPriority}
         existingNames={existingNames}
+      />
+
+      {/* Delete priority confirmation modal */}
+      <ConfirmModal
+        isOpen={deletingPriority !== null}
+        onClose={() => setDeletingPriority(null)}
+        onConfirm={handleConfirmDelete}
+        title="Ta bort kategori?"
+        message={deleteModalMessage}
+        confirmText="Ta bort"
+        cancelText="Avbryt"
+        variant="danger"
       />
     </div>
   )

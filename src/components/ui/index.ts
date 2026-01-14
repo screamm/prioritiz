@@ -1,4 +1,5 @@
 export { Button, type ButtonProps, type ButtonVariant, type ButtonSize } from './Button'
+export { ConfirmModal, type ConfirmModalProps } from './ConfirmModal'
 export { Input, type InputProps } from './Input'
 export { Modal, type ModalProps } from './Modal'
 export { ToastContainer, type ToastContainerProps } from './Toast'

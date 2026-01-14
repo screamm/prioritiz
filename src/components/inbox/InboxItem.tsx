@@ -1,10 +1,11 @@
-import { memo, forwardRef } from 'react'
+import { memo, forwardRef, useState, useCallback } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { motion } from 'framer-motion'
 import { GripVertical, Check, Trash2 } from 'lucide-react'
 import type { Todo } from '@/types'
 import { cn } from '@/utils'
+import { ConfirmModal } from '@/components/ui'
 
 interface InboxItemProps {
   todo: Todo
@@ -17,6 +18,8 @@ export const InboxItem = memo(
     { todo, onToggle, onDelete },
     ref
   ) {
+    const [showDeleteModal, setShowDeleteModal] = useState(false)
+
     const {
       attributes,
       listeners,
@@ -25,6 +28,15 @@ export const InboxItem = memo(
       transition,
       isDragging,
     } = useSortable({ id: todo.id })
+
+    const handleDeleteClick = useCallback(() => {
+      setShowDeleteModal(true)
+    }, [])
+
+    const handleConfirmDelete = useCallback(() => {
+      onDelete(todo.id)
+      setShowDeleteModal(false)
+    }, [onDelete, todo.id])
 
     const style = {
       transform: CSS.Transform.toString(transform),
@@ -116,7 +128,7 @@ export const InboxItem = memo(
       {/* Delete button */}
       <button
         type="button"
-        onClick={() => onDelete(todo.id)}
+        onClick={handleDeleteClick}
         className={cn(
           'flex-shrink-0 p-1 rounded opacity-0 group-hover:opacity-100',
           'text-white/40 hover:text-red-400 hover:bg-red-500/10',
@@ -127,6 +139,18 @@ export const InboxItem = memo(
       >
         <Trash2 className="w-3.5 h-3.5" />
       </button>
+
+      {/* Delete confirmation modal */}
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleConfirmDelete}
+        title="Ta bort uppgift?"
+        message={`Är du säker på att du vill ta bort "${todo.text}"?`}
+        confirmText="Ta bort"
+        cancelText="Avbryt"
+        variant="danger"
+      />
     </motion.div>
   )
   })
