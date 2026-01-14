@@ -108,13 +108,20 @@ export function DndProvider({ children }: DndProviderProps) {
         let targetPriorityId: string | null = null
         let targetOrder = 0
 
-        // Check if dropped on a priority column
+        // Check if dropped on inbox
         if (overId === 'inbox') {
           targetPriorityId = null
-        } else if (overId.startsWith('priority-')) {
+        }
+        // Check if dropped on a priority column droppable (priority-{id})
+        else if (overId.startsWith('priority-')) {
           targetPriorityId = overId.replace('priority-', '')
-        } else {
-          // Dropped on another todo - get its priority
+        }
+        // Check if dropped directly on a priority column sortable (just the id)
+        else if (priorities.some((p) => p.id === overId)) {
+          targetPriorityId = overId
+        }
+        // Dropped on another todo - get its priority
+        else {
           const overTodo = todos.find((t) => t.id === overId)
           if (overTodo) {
             targetPriorityId = overTodo.priorityId
@@ -127,7 +134,8 @@ export function DndProvider({ children }: DndProviderProps) {
           .filter((t) => t.priorityId === targetPriorityId && t.id !== activeId)
           .sort((a, b) => a.order - b.order)
 
-        if (overId === 'inbox' || overId.startsWith('priority-')) {
+        // Set target order if dropped on column (not on another todo)
+        if (overId === 'inbox' || overId.startsWith('priority-') || priorities.some((p) => p.id === overId)) {
           // Dropped on column - add to end
           targetOrder = todosInTarget.length
         }
@@ -138,7 +146,7 @@ export function DndProvider({ children }: DndProviderProps) {
         }
       }
     },
-    [todos, moveTodo, dragType, getSortedPriorities, reorderPriorities]
+    [todos, moveTodo, dragType, getSortedPriorities, reorderPriorities, priorities]
   )
 
   // Type guard for Todo
