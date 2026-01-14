@@ -28,7 +28,7 @@ export interface Settings {
 
 // === THEME ===
 
-export type ThemeType = 'sunset' | 'starwars' | 'starfall' | 'stars' | 'stars2' | 'aurora' | 'ocean'
+export type ThemeType = 'sunset' | 'starwars' | 'atat' | 'starfall' | 'stars' | 'stars2' | 'aurora' | 'ocean'
 
 export interface ThemeConfig {
   id: ThemeType
@@ -49,6 +49,12 @@ export const THEME_CONFIGS: ThemeConfig[] = [
     name: 'Hyperspace',
     description: 'Resa genom hyperrymden',
     preview: '/themes/starwars.jpg',
+  },
+  {
+    id: 'atat',
+    name: 'AT-AT Walker',
+    description: 'Imperial AT-AT på Hoth',
+    preview: '/themes/atat.jpg',
   },
   {
     id: 'starfall',

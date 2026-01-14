@@ -5,6 +5,7 @@ import type { ThemeType } from '@/types'
 
 const SunsetBackground = lazy(() => import('./SunsetBackground'))
 const StarWarsBackground = lazy(() => import('./StarWarsBackground'))
+const ATATBackground = lazy(() => import('./ATATBackground'))
 const StarfallBackground = lazy(() => import('./StarfallBackground'))
 const StarsBackground = lazy(() => import('./StarsBackground'))
 const Stars2Background = lazy(() => import('./Stars2Background'))
@@ -14,6 +15,7 @@ const OceanBackground = lazy(() => import('./OceanBackground'))
 const backgroundComponents: Record<ThemeType, ComponentType> = {
   sunset: SunsetBackground,
   starwars: StarWarsBackground,
+  atat: ATATBackground,
   starfall: StarfallBackground,
   stars: StarsBackground,
   stars2: Stars2Background,
