@@ -34,7 +34,6 @@ const syncSchema = z.object({
     .regex(/^[A-Z2-9]{3}-[A-Z2-9]{3}-[A-Z2-9]{3}$/, 'Invalid token format'),
   todos: z.array(todoSchema).max(1000),
   priorities: z.array(prioritySchema).max(50),
-  // Make lastSyncAt optional - can be undefined, null, or number
   lastSyncAt: z.number().int().positive().nullable().optional(),
 })
 
@@ -46,33 +45,33 @@ syncRoute.post('/', zValidator('json', syncSchema), async (c) => {
   const now = Date.now()
 
   try {
-    // Use a batch for better performance and atomicity
-    const statements: D1PreparedStatement[] = []
+    // Step 1: Upsert user
+    console.log(`[SYNC] Starting sync for token ${token.substring(0, 3)}***`)
+    console.log(`[SYNC] Priorities: ${priorities.length}, Todos: ${todos.length}`)
 
-    // Upsert user
-    statements.push(
-      db
-        .prepare(
-          `INSERT INTO users (token, created_at, last_sync_at)
-           VALUES (?, ?, ?)
-           ON CONFLICT(token) DO UPDATE SET last_sync_at = excluded.last_sync_at`
-        )
-        .bind(token, now, now)
-    )
+    await db
+      .prepare(
+        `INSERT INTO users (token, created_at, last_sync_at)
+         VALUES (?, ?, ?)
+         ON CONFLICT(token) DO UPDATE SET last_sync_at = excluded.last_sync_at`
+      )
+      .bind(token, now, now)
+      .run()
 
-    // Delete existing priorities and todos for this user first
-    // This ensures clean state before inserting new data
-    statements.push(
-      db.prepare('DELETE FROM todos WHERE user_token = ?').bind(token)
-    )
-    statements.push(
-      db.prepare('DELETE FROM priorities WHERE user_token = ?').bind(token)
-    )
+    console.log('[SYNC] User upserted successfully')
 
-    // Insert all priorities using INSERT (after DELETE, no conflicts possible)
-    for (const priority of priorities) {
-      statements.push(
-        db
+    // Step 2: Delete existing data for this user
+    await db.prepare('DELETE FROM todos WHERE user_token = ?').bind(token).run()
+    console.log('[SYNC] Todos deleted')
+
+    await db.prepare('DELETE FROM priorities WHERE user_token = ?').bind(token).run()
+    console.log('[SYNC] Priorities deleted')
+
+    // Step 3: Insert priorities one by one with error handling
+    for (let i = 0; i < priorities.length; i++) {
+      const priority = priorities[i]
+      try {
+        await db
           .prepare(
             `INSERT INTO priorities (id, user_token, name, color, icon, "order", is_default, created_at, updated_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -88,13 +87,20 @@ syncRoute.post('/', zValidator('json', syncSchema), async (c) => {
             now,
             now
           )
-      )
+          .run()
+      } catch (priorityError) {
+        console.error(`[SYNC] Error inserting priority ${i}:`, priority)
+        console.error(`[SYNC] Priority error:`, priorityError)
+        throw priorityError
+      }
     }
+    console.log(`[SYNC] ${priorities.length} priorities inserted`)
 
-    // Insert all todos
-    for (const todo of todos) {
-      statements.push(
-        db
+    // Step 4: Insert todos one by one with error handling
+    for (let i = 0; i < todos.length; i++) {
+      const todo = todos[i]
+      try {
+        await db
           .prepare(
             `INSERT INTO todos (id, user_token, text, completed, priority_id, "order", created_at, updated_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
@@ -109,11 +115,16 @@ syncRoute.post('/', zValidator('json', syncSchema), async (c) => {
             todo.createdAt,
             todo.updatedAt
           )
-      )
+          .run()
+      } catch (todoError) {
+        console.error(`[SYNC] Error inserting todo ${i}:`, todo)
+        console.error(`[SYNC] Todo error:`, todoError)
+        throw todoError
+      }
     }
+    console.log(`[SYNC] ${todos.length} todos inserted`)
 
-    // Execute all statements in batch (atomic transaction)
-    await db.batch(statements)
+    console.log('[SYNC] Sync completed successfully')
 
     return successResponse(c, {
       syncedAt: now,
@@ -121,21 +132,27 @@ syncRoute.post('/', zValidator('json', syncSchema), async (c) => {
       prioritiesCount: priorities.length,
     })
   } catch (error) {
-    console.error('Sync error:', error)
+    // Log the full error for debugging
+    console.error('[SYNC] Full error:', error)
+    console.error('[SYNC] Error name:', error instanceof Error ? error.name : 'Unknown')
+    console.error('[SYNC] Error message:', error instanceof Error ? error.message : String(error))
+
+    // Return more specific error message in development
+    const errorMessage = error instanceof Error ? error.message : 'Unknown database error'
+
     return errorResponse(
       c,
       ErrorCodes.DATABASE_ERROR,
-      'Failed to sync data. Please try again.',
+      `Database error: ${errorMessage}`,
       500
     )
   }
 })
 
-// Optional: GET endpoint to check last sync time for a token
+// GET endpoint to check last sync time for a token
 syncRoute.get('/:token', async (c) => {
   const token = c.req.param('token')
 
-  // Validate token format
   if (!/^[A-Z2-9]{3}-[A-Z2-9]{3}-[A-Z2-9]{3}$/.test(token)) {
     return errorResponse(
       c,
