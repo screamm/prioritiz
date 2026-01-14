@@ -1,5 +1,5 @@
 // API Configuration
-export const API_URL = import.meta.env.VITE_API_URL || 'https://api-prioritiz.pages.dev'
+export const API_URL = import.meta.env.VITE_API_URL || 'https://prioritiz-api.davidrydgren.workers.dev'
 
 // Sync Configuration
 export const SYNC_DEBOUNCE_MS = 5000 // 5 seconds after last change
