@@ -1,0 +1,54 @@
+name = "prioritiz-api"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Development settings
+[dev]
+port = 8787
+local_protocol = "http"
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "prioritiz-db"
+database_id = "YOUR_DATABASE_ID_HERE"
+
+# Environment variables (non-secret)
+[vars]
+ENVIRONMENT = "production"
+ALLOWED_ORIGINS = "https://prioritiz.pages.dev,http://localhost:5173"
+
+# Rate limiting configuration
+# Note: Actual rate limiting is implemented in middleware
+
+# Secrets (set via wrangler secret put):
+# - MAILGUN_API_KEY
+# - MAILGUN_DOMAIN
+
+# Production environment
+[env.production]
+name = "prioritiz-api"
+routes = [
+  { pattern = "api.prioritiz.pages.dev", custom_domain = true }
+]
+
+[env.production.vars]
+ENVIRONMENT = "production"
+ALLOWED_ORIGINS = "https://prioritiz.pages.dev"
+
+# Staging environment
+[env.staging]
+name = "prioritiz-api-staging"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+ALLOWED_ORIGINS = "https://staging.prioritiz.pages.dev,http://localhost:5173"
+
+# Build configuration
+[build]
+command = "npm run build"
+
+# Observability
+[observability]
+enabled = true
