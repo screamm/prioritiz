@@ -1,5 +1,6 @@
 export { SettingsModal } from './SettingsModal'
 export { ThemeSelector } from './ThemeSelector'
 export { TokenDisplay } from './TokenDisplay'
+export { RestoreToken } from './RestoreToken'
 export { QRCodeModal } from './QRCodeModal'
 export { EmailModal } from './EmailModal'

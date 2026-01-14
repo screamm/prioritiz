@@ -1,6 +1,7 @@
 import { Modal, Button } from '@/components/ui'
 import { ThemeSelector } from './ThemeSelector'
 import { TokenDisplay } from './TokenDisplay'
+import { RestoreToken } from './RestoreToken'
 
 interface SettingsModalProps {
   isOpen: boolean
@@ -22,9 +23,17 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         {/* Token Management */}
         <section>
           <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-white/60">
-            Återställningskod
+            Din återställningskod
           </h3>
           <TokenDisplay />
+        </section>
+
+        {/* Restore from Code */}
+        <section>
+          <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-white/60">
+            Återställ från kod
+          </h3>
+          <RestoreToken />
         </section>
 
         {/* Danger Zone */}
