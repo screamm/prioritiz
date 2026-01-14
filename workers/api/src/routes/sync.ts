@@ -20,7 +20,7 @@ const prioritySchema = z.object({
   id: z.string().min(1).max(100),
   name: z.string().min(1).max(100),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid color format'),
-  icon: z.string().max(50).optional(),
+  icon: z.string().max(50).optional().nullable(),
   order: z.number().int().min(0),
   isDefault: z.boolean(),
 })
@@ -32,9 +32,10 @@ const syncSchema = z.object({
     .min(11)
     .max(11)
     .regex(/^[A-Z2-9]{3}-[A-Z2-9]{3}-[A-Z2-9]{3}$/, 'Invalid token format'),
-  todos: z.array(todoSchema).max(1000), // Limit to 1000 todos
-  priorities: z.array(prioritySchema).max(50), // Limit to 50 priorities
-  lastSyncAt: z.number().int().positive().nullable(),
+  todos: z.array(todoSchema).max(1000),
+  priorities: z.array(prioritySchema).max(50),
+  // Make lastSyncAt optional - can be undefined, null, or number
+  lastSyncAt: z.number().int().positive().nullable().optional(),
 })
 
 export const syncRoute = new Hono<{ Bindings: Bindings }>()
@@ -59,17 +60,16 @@ syncRoute.post('/', zValidator('json', syncSchema), async (c) => {
         .bind(token, now, now)
     )
 
-    // Delete existing priorities for this user
+    // Delete existing priorities and todos for this user first
+    // This ensures clean state before inserting new data
+    statements.push(
+      db.prepare('DELETE FROM todos WHERE user_token = ?').bind(token)
+    )
     statements.push(
       db.prepare('DELETE FROM priorities WHERE user_token = ?').bind(token)
     )
 
-    // Delete existing todos for this user
-    statements.push(
-      db.prepare('DELETE FROM todos WHERE user_token = ?').bind(token)
-    )
-
-    // Insert all priorities
+    // Insert all priorities using INSERT (after DELETE, no conflicts possible)
     for (const priority of priorities) {
       statements.push(
         db
@@ -112,7 +112,7 @@ syncRoute.post('/', zValidator('json', syncSchema), async (c) => {
       )
     }
 
-    // Execute all statements in batch
+    // Execute all statements in batch (atomic transaction)
     await db.batch(statements)
 
     return successResponse(c, {

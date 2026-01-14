@@ -40,7 +40,7 @@ class SyncService {
         token,
         todos,
         priorities,
-        lastSyncAt,
+        lastSyncAt: lastSyncAt ?? null, // Ensure null instead of undefined
       })
 
       if (response.success) {
