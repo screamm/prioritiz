@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { AlertTriangle, Trash2, X } from 'lucide-react'
 import { cn } from '@/utils'
@@ -102,7 +103,9 @@ export function ConfirmModal({
   const iconBgColor = variant === 'danger' ? 'bg-red-500/20' : 'bg-amber-500/20'
   const iconColor = variant === 'danger' ? 'text-red-400' : 'text-amber-400'
 
-  return (
+  // Use portal to render at document body level
+  // This ensures the modal always appears on top regardless of parent z-index
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -204,7 +207,8 @@ export function ConfirmModal({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }
 
