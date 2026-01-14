@@ -12,7 +12,7 @@ local_protocol = "http"
 [[d1_databases]]
 binding = "DB"
 database_name = "prioritiz-db"
-database_id = "YOUR_DATABASE_ID_HERE"
+database_id = "c86396ce-ed2d-4929-b21b-39ddeacce558"
 
 # Environment variables (non-secret)
 [vars]
