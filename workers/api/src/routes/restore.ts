@@ -1,6 +1,12 @@
 import { Hono } from 'hono'
 import type { Bindings } from '../index'
-import { successResponse, errorResponse, ErrorCodes } from '../utils/response'
+import {
+  successResponse,
+  errorResponse,
+  ErrorCodes,
+  isTokenExpired,
+  TOKEN_EXPIRATION_DAYS,
+} from '../utils/response'
 
 // Database row types
 interface UserRow {
@@ -86,6 +92,16 @@ restoreRoute.get('/:token', async (c) => {
         ErrorCodes.TOKEN_NOT_FOUND,
         'No data found for this token. Please check that you entered the correct code.',
         404
+      )
+    }
+
+    // Check if token is expired
+    if (isTokenExpired(user.created_at)) {
+      return errorResponse(
+        c,
+        ErrorCodes.TOKEN_EXPIRED,
+        `This token has expired. Tokens are valid for ${TOKEN_EXPIRATION_DAYS} days. Please generate a new token on your original device.`,
+        403
       )
     }
 

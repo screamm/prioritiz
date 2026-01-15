@@ -1,17 +1,26 @@
 import { useState } from 'react'
-import { Copy, Check, Mail, QrCode, RefreshCw } from 'lucide-react'
+import { Copy, Check, Mail, QrCode, RefreshCw, AlertTriangle, Clock } from 'lucide-react'
 import { useSettingsStore } from '@/stores'
 import { toast } from '@/stores/toastStore'
 import { copyToClipboard } from '@/utils'
 import { Button } from '@/components/ui'
 import { QRCodeModal } from './QRCodeModal'
 import { EmailModal } from './EmailModal'
+import { TOKEN_EXPIRATION_DAYS } from '@/types'
 
 export function TokenDisplay() {
-  const { token, generateNewToken } = useSettingsStore()
+  const {
+    token,
+    regenerateToken,
+    getTokenStatus,
+    getDaysRemaining,
+  } = useSettingsStore()
   const [copied, setCopied] = useState(false)
   const [qrModalOpen, setQrModalOpen] = useState(false)
   const [emailModalOpen, setEmailModalOpen] = useState(false)
+
+  const tokenStatus = getTokenStatus()
+  const daysRemaining = getDaysRemaining()
 
   const handleCopy = async () => {
     if (token) {
@@ -24,9 +33,13 @@ export function TokenDisplay() {
     }
   }
 
-  const handleGenerateNew = () => {
-    if (confirm('Generera ny token? Din gamla token kommer sluta fungera.')) {
-      const newToken = generateNewToken()
+  const handleRegenerateToken = () => {
+    const message = tokenStatus === 'expired'
+      ? 'Din token har gatt ut. Vill du generera en ny token?'
+      : 'Generera ny token? Din gamla token kommer sluta fungera.'
+
+    if (confirm(message)) {
+      const newToken = regenerateToken()
       toast.success(`Ny token genererad: ${newToken}`)
     }
   }
@@ -41,20 +54,78 @@ export function TokenDisplay() {
     )
   }
 
+  // Determine status display info
+  const getStatusInfo = () => {
+    switch (tokenStatus) {
+      case 'expired':
+        return {
+          color: 'text-red-400',
+          bgColor: 'bg-red-500/10 border-red-500/30',
+          icon: AlertTriangle,
+          text: 'Token har gatt ut',
+          subtext: 'Generera en ny token for att kunna aterstalla din data.',
+        }
+      case 'expiring':
+        return {
+          color: 'text-amber-400',
+          bgColor: 'bg-amber-500/10 border-amber-500/30',
+          icon: AlertTriangle,
+          text: `Token gar ut om ${daysRemaining} ${daysRemaining === 1 ? 'dag' : 'dagar'}`,
+          subtext: 'Fornya din token for att forlangs giltigheten.',
+        }
+      default:
+        return {
+          color: 'text-white/60',
+          bgColor: '',
+          icon: Clock,
+          text: daysRemaining !== null ? `Giltig i ${daysRemaining} dagar` : '',
+          subtext: '',
+        }
+    }
+  }
+
+  const statusInfo = getStatusInfo()
+  const StatusIcon = statusInfo.icon
+
   return (
     <>
       <div className="space-y-4">
+        {/* Expiration Warning Banner */}
+        {(tokenStatus === 'expired' || tokenStatus === 'expiring') && (
+          <div className={`flex items-start gap-3 rounded-lg border p-3 ${statusInfo.bgColor}`}>
+            <StatusIcon className={`h-5 w-5 flex-shrink-0 ${statusInfo.color}`} />
+            <div className="flex-1">
+              <p className={`text-sm font-medium ${statusInfo.color}`}>
+                {statusInfo.text}
+              </p>
+              <p className="mt-0.5 text-xs text-white/50">
+                {statusInfo.subtext}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Token Display */}
         <div className="flex items-center gap-3 rounded-lg bg-surface p-4">
           <div className="flex-1">
-            <p className="mb-1 text-xs text-white/50">Din återställningskod</p>
-            <p className="font-mono text-2xl tracking-wider text-white">{token}</p>
+            <p className="mb-1 text-xs text-white/50">Din aterstallningskod</p>
+            <p className={`font-mono text-2xl tracking-wider ${tokenStatus === 'expired' ? 'text-white/40 line-through' : 'text-white'}`}>
+              {token}
+            </p>
+            {/* Expiration info for valid tokens */}
+            {tokenStatus === 'valid' && daysRemaining !== null && (
+              <p className="mt-1 flex items-center gap-1 text-xs text-white/40">
+                <Clock className="h-3 w-3" />
+                Giltig i {daysRemaining} {daysRemaining === 1 ? 'dag' : 'dagar'} (totalt {TOKEN_EXPIRATION_DAYS} dagar)
+              </p>
+            )}
           </div>
           <Button
             variant="ghost"
             size="sm"
             onClick={handleCopy}
             title="Kopiera"
+            disabled={tokenStatus === 'expired'}
           >
             {copied ? (
               <Check className="h-5 w-5 text-green-400" />
@@ -66,23 +137,38 @@ export function TokenDisplay() {
 
         {/* Actions */}
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" size="sm" onClick={() => setQrModalOpen(true)}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setQrModalOpen(true)}
+            disabled={tokenStatus === 'expired'}
+          >
             <QrCode className="mr-2 h-4 w-4" />
             Visa QR-kod
           </Button>
-          <Button variant="secondary" size="sm" onClick={() => setEmailModalOpen(true)}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setEmailModalOpen(true)}
+            disabled={tokenStatus === 'expired'}
+          >
             <Mail className="mr-2 h-4 w-4" />
             Skicka via e-post
           </Button>
-          <Button variant="ghost" size="sm" onClick={handleGenerateNew}>
+          <Button
+            variant={tokenStatus === 'expired' || tokenStatus === 'expiring' ? 'primary' : 'ghost'}
+            size="sm"
+            onClick={handleRegenerateToken}
+          >
             <RefreshCw className="mr-2 h-4 w-4" />
-            Generera ny
+            {tokenStatus === 'expired' ? 'Generera ny token' : 'Fornya token'}
           </Button>
         </div>
 
         {/* Info */}
         <p className="text-xs text-white/40">
-          Spara denna kod för att kunna återställa din lista om du rensar webbläsardata.
+          Spara denna kod for att kunna aterstalla din lista om du rensar webblasardata.
+          Tokens ar giltiga i {TOKEN_EXPIRATION_DAYS} dagar.
         </p>
       </div>
 

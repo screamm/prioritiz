@@ -23,7 +23,37 @@ export interface Settings {
   theme: ThemeType
   token: string | null
   tokenCreatedAt: number | null
+  tokenExpiresAt: number | null
   lastSyncAt: number | null
+}
+
+// Token expiration constants
+export const TOKEN_EXPIRATION_DAYS = 90
+export const TOKEN_WARNING_DAYS = 7
+export const TOKEN_EXPIRATION_MS = TOKEN_EXPIRATION_DAYS * 24 * 60 * 60 * 1000
+
+// Token status utilities
+export type TokenStatus = 'valid' | 'expiring' | 'expired' | 'none'
+
+export function getTokenStatus(expiresAt: number | null): TokenStatus {
+  if (!expiresAt) return 'none'
+
+  const now = Date.now()
+  if (now >= expiresAt) return 'expired'
+
+  const daysRemaining = Math.ceil((expiresAt - now) / (24 * 60 * 60 * 1000))
+  if (daysRemaining <= TOKEN_WARNING_DAYS) return 'expiring'
+
+  return 'valid'
+}
+
+export function getDaysRemaining(expiresAt: number | null): number | null {
+  if (!expiresAt) return null
+
+  const now = Date.now()
+  if (now >= expiresAt) return 0
+
+  return Math.ceil((expiresAt - now) / (24 * 60 * 60 * 1000))
 }
 
 // === THEME ===

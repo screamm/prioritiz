@@ -175,11 +175,14 @@ export function useUserToken() {
 }
 
 /**
- * Hook for sync status monitoring.
+ * Basic hook for sync status monitoring.
  *
- * @returns Sync status information
+ * @deprecated Use the enhanced `useSyncStatus` from `@/hooks/useSyncStatus` instead,
+ * which provides offline detection, error handling, and retry status.
+ *
+ * @returns Basic sync status information
  */
-export function useSyncStatus() {
+export function useBasicSyncStatus() {
   const lastSyncAt = useSettingsStore((state) => state.lastSyncAt)
   const setLastSyncAt = useSettingsStore((state) => state.setLastSyncAt)
 

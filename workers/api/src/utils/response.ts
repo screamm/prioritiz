@@ -5,6 +5,7 @@ export const ErrorCodes = {
   VALIDATION_ERROR: 'VALIDATION_ERROR',
   INVALID_TOKEN: 'INVALID_TOKEN',
   TOKEN_NOT_FOUND: 'TOKEN_NOT_FOUND',
+  TOKEN_EXPIRED: 'TOKEN_EXPIRED',
   INVALID_EMAIL: 'INVALID_EMAIL',
   EMAIL_SEND_FAILED: 'EMAIL_SEND_FAILED',
   RATE_LIMITED: 'RATE_LIMITED',
@@ -75,6 +76,7 @@ function getErrorTitle(code: ErrorCode): string {
     [ErrorCodes.VALIDATION_ERROR]: 'Validation Error',
     [ErrorCodes.INVALID_TOKEN]: 'Invalid Token',
     [ErrorCodes.TOKEN_NOT_FOUND]: 'Token Not Found',
+    [ErrorCodes.TOKEN_EXPIRED]: 'Token Expired',
     [ErrorCodes.INVALID_EMAIL]: 'Invalid Email',
     [ErrorCodes.EMAIL_SEND_FAILED]: 'Email Send Failed',
     [ErrorCodes.RATE_LIMITED]: 'Rate Limited',
@@ -83,6 +85,20 @@ function getErrorTitle(code: ErrorCode): string {
     [ErrorCodes.DATABASE_ERROR]: 'Database Error',
   }
   return titles[code] || 'Error'
+}
+
+// Token expiration constants (must match frontend)
+export const TOKEN_EXPIRATION_DAYS = 90
+export const TOKEN_EXPIRATION_MS = TOKEN_EXPIRATION_DAYS * 24 * 60 * 60 * 1000
+
+/**
+ * Checks if a token is expired based on creation timestamp
+ * For backward compatibility, tokens without expiration info are considered valid
+ */
+export function isTokenExpired(createdAt: number | null): boolean {
+  if (!createdAt) return false // Backward compatibility: no creation date = valid
+  const expiresAt = createdAt + TOKEN_EXPIRATION_MS
+  return Date.now() >= expiresAt
 }
 
 /**

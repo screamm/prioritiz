@@ -24,6 +24,111 @@ interface DndProviderProps {
 
 type DragType = 'todo' | 'priority' | null
 
+/**
+ * Result of parsing an overId from dnd-kit
+ */
+interface ParsedDropTarget {
+  type: 'inbox' | 'priority-column' | 'todo' | 'unknown'
+  priorityId: string | null
+  todoId: string | null
+}
+
+/**
+ * Parse overId and determine target type and IDs
+ * Handles the various ID formats:
+ * - 'inbox' -> inbox column
+ * - 'priority-{id}' -> priority column droppable
+ * - raw '{id}' matching a priority -> priority column sortable
+ * - todo id -> another todo item
+ */
+function parseDropTarget(
+  overId: string,
+  todos: Todo[],
+  priorities: Priority[]
+): ParsedDropTarget {
+  // Check if dropped on inbox
+  if (overId === 'inbox') {
+    return {
+      type: 'inbox',
+      priorityId: null,
+      todoId: null,
+    }
+  }
+
+  // Check if dropped on a priority column droppable (format: priority-{id})
+  if (overId.startsWith('priority-')) {
+    const priorityId = overId.replace('priority-', '')
+    // Validate that this priority exists
+    const priorityExists = priorities.some((p) => p.id === priorityId)
+    if (priorityExists) {
+      return {
+        type: 'priority-column',
+        priorityId,
+        todoId: null,
+      }
+    }
+  }
+
+  // Check if dropped directly on a priority column sortable (just the id)
+  const matchingPriority = priorities.find((p) => p.id === overId)
+  if (matchingPriority) {
+    return {
+      type: 'priority-column',
+      priorityId: matchingPriority.id,
+      todoId: null,
+    }
+  }
+
+  // Check if dropped on another todo
+  const overTodo = todos.find((t) => t.id === overId)
+  if (overTodo) {
+    return {
+      type: 'todo',
+      priorityId: overTodo.priorityId,
+      todoId: overTodo.id,
+    }
+  }
+
+  // Unknown target
+  return {
+    type: 'unknown',
+    priorityId: null,
+    todoId: null,
+  }
+}
+
+/**
+ * Calculate the target order for a todo being moved
+ */
+function calculateTargetOrder(
+  dropTarget: ParsedDropTarget,
+  activeId: string,
+  todos: Todo[]
+): number {
+  // Get todos in the target priority (excluding the one being dragged)
+  const todosInTarget = todos
+    .filter((t) => t.priorityId === dropTarget.priorityId && t.id !== activeId)
+    .sort((a, b) => a.order - b.order)
+
+  // If dropped on a column (inbox or priority), add to end
+  if (dropTarget.type === 'inbox' || dropTarget.type === 'priority-column') {
+    return todosInTarget.length
+  }
+
+  // If dropped on another todo, insert BEFORE that todo
+  if (dropTarget.type === 'todo' && dropTarget.todoId) {
+    const overTodoIndex = todosInTarget.findIndex((t) => t.id === dropTarget.todoId)
+    if (overTodoIndex !== -1) {
+      return overTodoIndex
+    }
+    // Fallback to end if todo not found
+    return todosInTarget.length
+  }
+
+  // Default to end
+  return todosInTarget.length
+}
+
 export function DndProvider({ children }: DndProviderProps) {
   const [activeItem, setActiveItem] = useState<Todo | Priority | null>(null)
   const [dragType, setDragType] = useState<DragType>(null)
@@ -104,45 +209,34 @@ export function DndProvider({ children }: DndProviderProps) {
         const activeTodo = todos.find((t) => t.id === activeId)
         if (!activeTodo) return
 
-        // Determine target priority
-        let targetPriorityId: string | null = null
-        let targetOrder = 0
+        // Parse the drop target to determine where we're dropping
+        const dropTarget = parseDropTarget(overId, todos, priorities)
 
-        // Check if dropped on inbox
-        if (overId === 'inbox') {
-          targetPriorityId = null
+        // Bail out if we couldn't determine a valid target
+        if (dropTarget.type === 'unknown') {
+          console.warn('DndProvider: Unknown drop target:', overId)
+          return
         }
-        // Check if dropped on a priority column droppable (priority-{id})
-        else if (overId.startsWith('priority-')) {
-          targetPriorityId = overId.replace('priority-', '')
-        }
-        // Check if dropped directly on a priority column sortable (just the id)
-        else if (priorities.some((p) => p.id === overId)) {
-          targetPriorityId = overId
-        }
-        // Dropped on another todo - get its priority
-        else {
-          const overTodo = todos.find((t) => t.id === overId)
-          if (overTodo) {
-            targetPriorityId = overTodo.priorityId
-            targetOrder = overTodo.order
+
+        // Validate that targetPriorityId exists (if not null/inbox)
+        if (dropTarget.priorityId !== null) {
+          const priorityExists = priorities.some((p) => p.id === dropTarget.priorityId)
+          if (!priorityExists) {
+            console.warn('DndProvider: Target priority does not exist:', dropTarget.priorityId)
+            return
           }
         }
 
-        // Calculate target order
-        const todosInTarget = todos
-          .filter((t) => t.priorityId === targetPriorityId && t.id !== activeId)
-          .sort((a, b) => a.order - b.order)
+        // Calculate the target order
+        const targetOrder = calculateTargetOrder(dropTarget, activeId, todos)
 
-        // Set target order if dropped on column (not on another todo)
-        if (overId === 'inbox' || overId.startsWith('priority-') || priorities.some((p) => p.id === overId)) {
-          // Dropped on column - add to end
-          targetOrder = todosInTarget.length
-        }
-
-        // Move the todo
-        if (activeTodo.priorityId !== targetPriorityId || activeTodo.order !== targetOrder) {
-          moveTodo(activeId, targetPriorityId, targetOrder)
+        // Only move if something actually changed
+        if (activeTodo.priorityId !== dropTarget.priorityId || activeTodo.order !== targetOrder) {
+          try {
+            moveTodo(activeId, dropTarget.priorityId, targetOrder)
+          } catch (error) {
+            console.error('DndProvider: Failed to move todo:', error)
+          }
         }
       }
     },

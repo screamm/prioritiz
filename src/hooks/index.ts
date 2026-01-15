@@ -13,5 +13,9 @@ export { usePriorities, usePriority } from './usePriorities'
 export type { PriorityWithCounts } from './usePriorities'
 
 // Settings management hooks
-export { useSettings, useTheme, useUserToken, useSyncStatus } from './useSettings'
+export { useSettings, useTheme, useUserToken } from './useSettings'
 export type { SyncStatus } from './useSettings'
+
+// Sync status hooks (enhanced with offline detection and error handling)
+export { useSyncStatus, useOnlineStatus } from './useSyncStatus'
+export type { UseSyncStatusResult } from './useSyncStatus'

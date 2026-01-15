@@ -97,11 +97,11 @@ export function TodoInput({
           data-testid="todo-input"
         />
 
-        {text.length > 0 && (
+        {text.length > 400 && (
           <span
             className={cn(
               'text-xs flex-shrink-0 transition-colors duration-200',
-              isOverLimit ? 'text-red-400' : 'text-white/40'
+              isOverLimit ? 'text-red-400' : text.length > 450 ? 'text-yellow-400' : 'text-white/40'
             )}
           >
             {text.length}/{LIMITS.TODO_TEXT_MAX}

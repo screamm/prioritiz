@@ -1,5 +1,3 @@
-import type { CorsOptions } from 'hono/cors'
-
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:4173',
@@ -10,8 +8,8 @@ const allowedOrigins = [
 // Pattern to match Cloudflare Pages preview deployments
 const pagesDevPattern = /^https:\/\/[a-z0-9-]+\.prioritiz\.pages\.dev$/
 
-export const corsConfig: CorsOptions = {
-  origin: (origin) => {
+export const corsConfig = {
+  origin: (origin: string | undefined) => {
     // Allow requests with no origin (like mobile apps or curl)
     if (!origin) {
       return '*'
