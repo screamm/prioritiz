@@ -7,7 +7,7 @@ import { STORAGE_KEYS } from '@/utils/constants'
 
 // Key for token lock in localStorage (prevents race conditions across tabs)
 const TOKEN_LOCK_KEY = 'prioritiz_token_lock'
-const TOKEN_LOCK_TIMEOUT_MS = 5000 // 5 second lock timeout
+const TOKEN_LOCK_FRESHNESS_MS = 5000 // Lock considered stale after 5 seconds
 
 interface SettingsState extends Settings {
   // Actions
@@ -33,28 +33,47 @@ const initialSettings: Settings = {
   lastSyncAt: null,
 }
 
+interface TokenLockData {
+  id: string
+  timestamp: number
+}
+
 /**
  * Attempts to acquire a lock for token generation using localStorage.
+ * Uses a unique lock ID to prevent TOCTOU race conditions.
  * Returns true if lock acquired, false otherwise.
  */
 function acquireTokenLock(): boolean {
-  const now = Date.now()
+  const lockId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
   const existingLock = localStorage.getItem(TOKEN_LOCK_KEY)
 
+  // Check if there's an existing lock that's still fresh
   if (existingLock) {
-    const lockTime = parseInt(existingLock, 10)
-    // Check if lock is still valid (not expired)
-    if (now - lockTime < TOKEN_LOCK_TIMEOUT_MS) {
-      return false
+    try {
+      const lockData: TokenLockData = JSON.parse(existingLock)
+      if (Date.now() - lockData.timestamp < TOKEN_LOCK_FRESHNESS_MS) {
+        return false // Lock is held by another tab
+      }
+    } catch {
+      // Invalid lock data, proceed to acquire
     }
   }
 
-  // Try to acquire lock using compare-and-swap pattern
-  localStorage.setItem(TOKEN_LOCK_KEY, now.toString())
+  // Set our lock with unique ID
+  const ourLock: TokenLockData = {
+    id: lockId,
+    timestamp: Date.now(),
+  }
+  localStorage.setItem(TOKEN_LOCK_KEY, JSON.stringify(ourLock))
 
-  // Verify we got the lock (another tab might have set it at the same time)
+  // Verify we still hold the lock (another tab might have written at the same time)
   const verifyLock = localStorage.getItem(TOKEN_LOCK_KEY)
-  return verifyLock === now.toString()
+  try {
+    const lockData: TokenLockData = JSON.parse(verifyLock || '')
+    return lockData.id === lockId
+  } catch {
+    return false
+  }
 }
 
 /**

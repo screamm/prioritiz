@@ -45,16 +45,23 @@ function RestorePage() {
 
   useEffect(() => {
     if (token) {
-      syncService.restore(token).then((success) => {
-        setIsRestoring(false)
-        if (success) {
-          toast.success('Din lista har återställts!')
+      syncService.restore(token)
+        .then((success) => {
+          setIsRestoring(false)
+          if (success) {
+            toast.success('Din lista har återställts!')
+            navigate('/', { replace: true })
+          } else {
+            toast.error('Kunde inte återställa. Kontrollera koden.')
+            navigate('/', { replace: true })
+          }
+        })
+        .catch((error) => {
+          console.error('Failed to restore:', error)
+          setIsRestoring(false)
+          toast.error('Kunde inte återställa data. Kontrollera din kod och försök igen.')
           navigate('/', { replace: true })
-        } else {
-          toast.error('Kunde inte återställa. Kontrollera koden.')
-          navigate('/', { replace: true })
-        }
-      })
+        })
     }
   }, [token, navigate])
 

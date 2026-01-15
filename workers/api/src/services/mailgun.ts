@@ -10,6 +10,21 @@ interface MailgunResponse {
 }
 
 /**
+ * Escapes HTML special characters to prevent XSS attacks
+ * when interpolating dynamic values into HTML templates.
+ */
+function escapeHtml(text: string): string {
+  const htmlEscapes: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }
+  return text.replace(/[&<>"']/g, (char) => htmlEscapes[char])
+}
+
+/**
  * Sends an email using the Mailgun API
  */
 export async function sendEmail(
@@ -89,6 +104,10 @@ function htmlToPlainText(html: string): string {
  * Creates the HTML template for the token recovery email
  */
 export function createTokenEmailHtml(token: string, restoreUrl: string): string {
+  // Escape all dynamic values to prevent XSS attacks
+  const safeToken = escapeHtml(token)
+  const safeRestoreUrl = escapeHtml(restoreUrl)
+
   return `
 <!DOCTYPE html>
 <html lang="sv">
@@ -137,7 +156,7 @@ export function createTokenEmailHtml(token: string, restoreUrl: string): string 
                             Din kod
                           </p>
                           <p style="margin: 0; font-size: 36px; font-family: 'SF Mono', SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-weight: 700; letter-spacing: 4px; color: #ffffff;">
-                            ${token}
+                            ${safeToken}
                           </p>
                         </td>
                       </tr>
@@ -151,7 +170,7 @@ export function createTokenEmailHtml(token: string, restoreUrl: string): string 
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                       <tr>
                         <td style="text-align: center;">
-                          <a href="${restoreUrl}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #ffffff; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">
+                          <a href="${safeRestoreUrl}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #ffffff; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">
                             Aterstall min lista
                           </a>
                         </td>
