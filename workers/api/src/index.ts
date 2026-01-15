@@ -7,6 +7,7 @@ import { healthRoute } from './routes/health'
 import { rateLimiter } from './middleware/rateLimit'
 import { corsConfig } from './middleware/cors'
 import { securityHeaders } from './middleware/security'
+import { handleScheduled } from './scheduled'
 
 export type Bindings = {
   DB: D1Database
@@ -67,4 +68,11 @@ app.onError((err, c) => {
   )
 })
 
-export default app
+// Export the Hono app as the default fetch handler
+// and add the scheduled handler for cron triggers
+export default {
+  fetch: app.fetch,
+  scheduled: async (_event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) => {
+    ctx.waitUntil(handleScheduled(env))
+  },
+}

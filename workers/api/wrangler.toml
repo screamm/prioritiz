@@ -48,3 +48,7 @@ ALLOWED_ORIGINS = "https://staging.prioritiz.pages.dev,http://localhost:5173"
 # Observability
 [observability]
 enabled = true
+
+# Cron triggers for scheduled tasks
+[triggers]
+crons = ["0 3 * * *"]  # Run daily at 3 AM UTC - cleanup expired users

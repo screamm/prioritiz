@@ -92,12 +92,18 @@ export const TOKEN_EXPIRATION_DAYS = 90
 export const TOKEN_EXPIRATION_MS = TOKEN_EXPIRATION_DAYS * 24 * 60 * 60 * 1000
 
 /**
- * Checks if a token is expired based on creation timestamp
- * For backward compatibility, tokens without expiration info are considered valid
+ * Checks if a token is expired based on last sync timestamp
+ * A token expires 90 days after the last sync (or creation if never synced)
+ * This rewards active users while allowing cleanup of abandoned data
  */
-export function isTokenExpired(createdAt: number | null): boolean {
-  if (!createdAt) return false // Backward compatibility: no creation date = valid
-  const expiresAt = createdAt + TOKEN_EXPIRATION_MS
+export function isTokenExpired(
+  lastSyncedAt: number | null,
+  createdAt: number | null
+): boolean {
+  // Use lastSyncedAt if available, otherwise fall back to createdAt
+  const referenceTimestamp = lastSyncedAt ?? createdAt
+  if (!referenceTimestamp) return false // Backward compatibility: no timestamps = valid
+  const expiresAt = referenceTimestamp + TOKEN_EXPIRATION_MS
   return Date.now() >= expiresAt
 }
 

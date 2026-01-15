@@ -95,12 +95,12 @@ restoreRoute.get('/:token', async (c) => {
       )
     }
 
-    // Check if token is expired
-    if (isTokenExpired(user.created_at)) {
+    // Check if token is expired (based on last sync, or creation if never synced)
+    if (isTokenExpired(user.last_sync_at, user.created_at)) {
       return errorResponse(
         c,
         ErrorCodes.TOKEN_EXPIRED,
-        `This token has expired. Tokens are valid for ${TOKEN_EXPIRATION_DAYS} days. Please generate a new token on your original device.`,
+        `This token has expired. Tokens are valid for ${TOKEN_EXPIRATION_DAYS} days after last sync. Please generate a new token on your original device.`,
         403
       )
     }

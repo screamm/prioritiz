@@ -23,7 +23,6 @@ export interface Settings {
   theme: ThemeType
   token: string | null
   tokenCreatedAt: number | null
-  tokenExpiresAt: number | null
   lastSyncAt: number | null
 }
 
@@ -33,10 +32,23 @@ export const TOKEN_WARNING_DAYS = 7
 export const TOKEN_EXPIRATION_MS = TOKEN_EXPIRATION_DAYS * 24 * 60 * 60 * 1000
 
 // Token status utilities
-export type TokenStatus = 'valid' | 'expiring' | 'expired' | 'none'
+export type TokenStatus = 'valid' | 'expiring' | 'expired' | 'none' | 'never-synced'
 
-export function getTokenStatus(expiresAt: number | null): TokenStatus {
-  if (!expiresAt) return 'none'
+/**
+ * Calculate token expiration based on lastSyncAt.
+ * If never synced, falls back to tokenCreatedAt.
+ * Expiration is always lastSyncAt/tokenCreatedAt + 90 days.
+ */
+export function getTokenStatus(
+  lastSyncAt: number | null,
+  tokenCreatedAt: number | null
+): TokenStatus {
+  // No token exists
+  if (!tokenCreatedAt) return 'none'
+
+  // Calculate expiration base: lastSyncAt or tokenCreatedAt
+  const expirationBase = lastSyncAt || tokenCreatedAt
+  const expiresAt = expirationBase + TOKEN_EXPIRATION_MS
 
   const now = Date.now()
   if (now >= expiresAt) return 'expired'
@@ -44,11 +56,26 @@ export function getTokenStatus(expiresAt: number | null): TokenStatus {
   const daysRemaining = Math.ceil((expiresAt - now) / (24 * 60 * 60 * 1000))
   if (daysRemaining <= TOKEN_WARNING_DAYS) return 'expiring'
 
+  // Token is valid, but indicate if never synced
+  if (!lastSyncAt) return 'never-synced'
+
   return 'valid'
 }
 
-export function getDaysRemaining(expiresAt: number | null): number | null {
-  if (!expiresAt) return null
+/**
+ * Calculate days remaining until token expires.
+ * Based on lastSyncAt + 90 days, with tokenCreatedAt as fallback.
+ */
+export function getDaysRemaining(
+  lastSyncAt: number | null,
+  tokenCreatedAt: number | null
+): number | null {
+  // No token exists
+  if (!tokenCreatedAt) return null
+
+  // Calculate expiration base: lastSyncAt or tokenCreatedAt
+  const expirationBase = lastSyncAt || tokenCreatedAt
+  const expiresAt = expirationBase + TOKEN_EXPIRATION_MS
 
   const now = Date.now()
   if (now >= expiresAt) return 0

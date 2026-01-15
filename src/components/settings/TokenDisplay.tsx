@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Copy, Check, Mail, QrCode, RefreshCw, AlertTriangle, Clock } from 'lucide-react'
+import { Copy, Check, Mail, QrCode, RefreshCw, AlertTriangle, Clock, CloudOff } from 'lucide-react'
 import { useSettingsStore } from '@/stores'
 import { toast } from '@/stores/toastStore'
 import { copyToClipboard } from '@/utils'
@@ -11,6 +11,7 @@ import { TOKEN_EXPIRATION_DAYS } from '@/types'
 export function TokenDisplay() {
   const {
     token,
+    lastSyncAt,
     regenerateToken,
     getTokenStatus,
     getDaysRemaining,
@@ -64,6 +65,7 @@ export function TokenDisplay() {
           icon: AlertTriangle,
           text: 'Token har gatt ut',
           subtext: 'Generera en ny token for att kunna aterstalla din data.',
+          showBanner: true,
         }
       case 'expiring':
         return {
@@ -71,7 +73,17 @@ export function TokenDisplay() {
           bgColor: 'bg-amber-500/10 border-amber-500/30',
           icon: AlertTriangle,
           text: `Token gar ut om ${daysRemaining} ${daysRemaining === 1 ? 'dag' : 'dagar'}`,
-          subtext: 'Fornya din token for att forlangs giltigheten.',
+          subtext: 'Synka for att forlanga giltigheten med 90 dagar.',
+          showBanner: true,
+        }
+      case 'never-synced':
+        return {
+          color: 'text-blue-400',
+          bgColor: 'bg-blue-500/10 border-blue-500/30',
+          icon: CloudOff,
+          text: 'Ej synkad an',
+          subtext: `Synka for att sakra din data. Token giltig i ${daysRemaining} ${daysRemaining === 1 ? 'dag' : 'dagar'}.`,
+          showBanner: true,
         }
       default:
         return {
@@ -79,7 +91,8 @@ export function TokenDisplay() {
           bgColor: '',
           icon: Clock,
           text: daysRemaining !== null ? `Giltig i ${daysRemaining} dagar` : '',
-          subtext: '',
+          subtext: 'Synka for att forlanga',
+          showBanner: false,
         }
     }
   }
@@ -87,11 +100,24 @@ export function TokenDisplay() {
   const statusInfo = getStatusInfo()
   const StatusIcon = statusInfo.icon
 
+  // Format last sync date for display
+  const formatLastSync = () => {
+    if (!lastSyncAt) return null
+    const date = new Date(lastSyncAt)
+    return date.toLocaleDateString('sv-SE', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
   return (
     <>
       <div className="space-y-4">
-        {/* Expiration Warning Banner */}
-        {(tokenStatus === 'expired' || tokenStatus === 'expiring') && (
+        {/* Status Banner */}
+        {statusInfo.showBanner && (
           <div className={`flex items-start gap-3 rounded-lg border p-3 ${statusInfo.bgColor}`}>
             <StatusIcon className={`h-5 w-5 flex-shrink-0 ${statusInfo.color}`} />
             <div className="flex-1">
@@ -112,12 +138,19 @@ export function TokenDisplay() {
             <p className={`font-mono text-2xl tracking-wider ${tokenStatus === 'expired' ? 'text-white/40 line-through' : 'text-white'}`}>
               {token}
             </p>
-            {/* Expiration info for valid tokens */}
+            {/* Expiration info for valid/synced tokens */}
             {tokenStatus === 'valid' && daysRemaining !== null && (
-              <p className="mt-1 flex items-center gap-1 text-xs text-white/40">
-                <Clock className="h-3 w-3" />
-                Giltig i {daysRemaining} {daysRemaining === 1 ? 'dag' : 'dagar'} (totalt {TOKEN_EXPIRATION_DAYS} dagar)
-              </p>
+              <div className="mt-1 space-y-0.5">
+                <p className="flex items-center gap-1 text-xs text-white/40">
+                  <Clock className="h-3 w-3" />
+                  Giltig i {daysRemaining} {daysRemaining === 1 ? 'dag' : 'dagar'} - Synka for att forlanga
+                </p>
+                {lastSyncAt && (
+                  <p className="text-xs text-white/30">
+                    Senast synkad: {formatLastSync()}
+                  </p>
+                )}
+              </div>
             )}
           </div>
           <Button
@@ -168,7 +201,7 @@ export function TokenDisplay() {
         {/* Info */}
         <p className="text-xs text-white/40">
           Spara denna kod for att kunna aterstalla din lista om du rensar webblasardata.
-          Tokens ar giltiga i {TOKEN_EXPIRATION_DAYS} dagar.
+          Varje synkning forlangar giltigheten med {TOKEN_EXPIRATION_DAYS} dagar.
         </p>
       </div>
 

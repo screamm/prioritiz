@@ -1,11 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Settings, ThemeType, TokenStatus } from '@/types'
-import {
-  TOKEN_EXPIRATION_MS,
-  getTokenStatus,
-  getDaysRemaining,
-} from '@/types'
+import { getTokenStatus, getDaysRemaining } from '@/types'
 import { generateToken } from '@/utils'
 import { STORAGE_KEYS } from '@/utils/constants'
 
@@ -22,19 +18,18 @@ interface SettingsState extends Settings {
   setLastSyncAt: (timestamp: number) => void
   clearSettings: () => void
   syncFromStorage: () => void
-  // Token expiration helpers
+  // Token expiration helpers (based on lastSyncAt)
   getTokenStatus: () => TokenStatus
   getDaysRemaining: () => number | null
   isTokenExpired: () => boolean
   isTokenExpiring: () => boolean
-  ensureTokenExpiration: () => void
+  hasNeverSynced: () => boolean
 }
 
 const initialSettings: Settings = {
   theme: 'starfall',
   token: null,
   tokenCreatedAt: null,
-  tokenExpiresAt: null,
   lastSyncAt: null,
 }
 
@@ -73,17 +68,17 @@ function releaseTokenLock(): void {
  * Gets the current token data from localStorage directly.
  * This bypasses the Zustand store to get the most current value across tabs.
  */
-function getTokenFromStorage(): { token: string; tokenCreatedAt: number; tokenExpiresAt: number } | null {
+function getTokenFromStorage(): { token: string; tokenCreatedAt: number; lastSyncAt: number | null } | null {
   try {
     const stored = localStorage.getItem(STORAGE_KEYS.SETTINGS)
     if (stored) {
       const parsed = JSON.parse(stored)
       const state = parsed.state
-      if (state?.token && state?.tokenCreatedAt && state?.tokenExpiresAt) {
+      if (state?.token && state?.tokenCreatedAt) {
         return {
           token: state.token,
           tokenCreatedAt: state.tokenCreatedAt,
-          tokenExpiresAt: state.tokenExpiresAt,
+          lastSyncAt: state.lastSyncAt || null,
         }
       }
     }
@@ -93,12 +88,11 @@ function getTokenFromStorage(): { token: string; tokenCreatedAt: number; tokenEx
   return null
 }
 
-function createTokenWithExpiration() {
+function createTokenData() {
   const now = Date.now()
   return {
     token: generateToken(),
     tokenCreatedAt: now,
-    tokenExpiresAt: now + TOKEN_EXPIRATION_MS,
   }
 }
 
@@ -116,7 +110,6 @@ export const useSettingsStore = create<SettingsState>()(
         set({
           token,
           tokenCreatedAt: now,
-          tokenExpiresAt: now + TOKEN_EXPIRATION_MS,
         })
       },
 
@@ -125,7 +118,11 @@ export const useSettingsStore = create<SettingsState>()(
         const existingToken = getTokenFromStorage()
         if (existingToken) {
           // Sync our store with the existing token
-          set(existingToken)
+          set({
+            token: existingToken.token,
+            tokenCreatedAt: existingToken.tokenCreatedAt,
+            lastSyncAt: existingToken.lastSyncAt,
+          })
           return existingToken.token
         }
 
@@ -140,7 +137,11 @@ export const useSettingsStore = create<SettingsState>()(
           // Another tab is generating, wait briefly and check again
           const retryToken = getTokenFromStorage()
           if (retryToken) {
-            set(retryToken)
+            set({
+              token: retryToken.token,
+              tokenCreatedAt: retryToken.tokenCreatedAt,
+              lastSyncAt: retryToken.lastSyncAt,
+            })
             return retryToken.token
           }
           // If still no token, generate anyway (fallback for edge cases)
@@ -150,12 +151,16 @@ export const useSettingsStore = create<SettingsState>()(
           // Double-check localStorage one more time after acquiring lock
           const doubleCheckToken = getTokenFromStorage()
           if (doubleCheckToken) {
-            set(doubleCheckToken)
+            set({
+              token: doubleCheckToken.token,
+              tokenCreatedAt: doubleCheckToken.tokenCreatedAt,
+              lastSyncAt: doubleCheckToken.lastSyncAt,
+            })
             return doubleCheckToken.token
           }
 
-          // Generate new token with expiration
-          const tokenData = createTokenWithExpiration()
+          // Generate new token (expiration calculated from tokenCreatedAt until first sync)
+          const tokenData = createTokenData()
           set(tokenData)
           return tokenData.token
         } finally {
@@ -166,8 +171,9 @@ export const useSettingsStore = create<SettingsState>()(
       regenerateToken: () => {
         // Force regeneration - for when user explicitly wants a new token
         // This doesn't check for existing tokens since user explicitly requested new one
-        const tokenData = createTokenWithExpiration()
-        set(tokenData)
+        // Reset lastSyncAt since this is a new token that hasn't been synced
+        const tokenData = createTokenData()
+        set({ ...tokenData, lastSyncAt: null })
         return tokenData.token
       },
 
@@ -182,19 +188,23 @@ export const useSettingsStore = create<SettingsState>()(
       syncFromStorage: () => {
         const storedToken = getTokenFromStorage()
         if (storedToken && storedToken.token !== get().token) {
-          set(storedToken)
+          set({
+            token: storedToken.token,
+            tokenCreatedAt: storedToken.tokenCreatedAt,
+            lastSyncAt: storedToken.lastSyncAt,
+          })
         }
       },
 
-      // Token expiration helpers
+      // Token expiration helpers (based on lastSyncAt + 90 days)
       getTokenStatus: () => {
-        const { tokenExpiresAt } = get()
-        return getTokenStatus(tokenExpiresAt)
+        const { lastSyncAt, tokenCreatedAt } = get()
+        return getTokenStatus(lastSyncAt, tokenCreatedAt)
       },
 
       getDaysRemaining: () => {
-        const { tokenExpiresAt } = get()
-        return getDaysRemaining(tokenExpiresAt)
+        const { lastSyncAt, tokenCreatedAt } = get()
+        return getDaysRemaining(lastSyncAt, tokenCreatedAt)
       },
 
       isTokenExpired: () => {
@@ -205,27 +215,12 @@ export const useSettingsStore = create<SettingsState>()(
         return get().getTokenStatus() === 'expiring'
       },
 
-      // Migrate existing tokens without expiration (backward compatibility)
-      ensureTokenExpiration: () => {
-        const { token, tokenCreatedAt, tokenExpiresAt } = get()
-        if (token && !tokenExpiresAt) {
-          // Set expiration based on creation date, or now if no creation date
-          const baseTime = tokenCreatedAt || Date.now()
-          set({
-            tokenCreatedAt: baseTime,
-            tokenExpiresAt: baseTime + TOKEN_EXPIRATION_MS,
-          })
-        }
+      hasNeverSynced: () => {
+        return get().getTokenStatus() === 'never-synced'
       },
     }),
     {
       name: STORAGE_KEYS.SETTINGS,
-      onRehydrateStorage: () => (state) => {
-        // Migrate existing tokens on load
-        if (state) {
-          state.ensureTokenExpiration()
-        }
-      },
     }
   )
 )
@@ -244,7 +239,7 @@ if (typeof window !== 'undefined') {
           useSettingsStore.setState({
             token: newToken,
             tokenCreatedAt: parsed.state?.tokenCreatedAt,
-            tokenExpiresAt: parsed.state?.tokenExpiresAt,
+            lastSyncAt: parsed.state?.lastSyncAt || null,
           })
         }
       } catch {
