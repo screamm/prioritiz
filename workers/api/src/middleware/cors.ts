@@ -29,7 +29,7 @@ export const corsConfig = {
     return null
   },
   allowMethods: ['GET', 'POST', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'X-Token', 'Authorization'],
+  allowHeaders: ['Content-Type', 'X-Token', 'Authorization', 'X-Request-ID'],
   exposeHeaders: ['X-Request-Id', 'X-RateLimit-Remaining'],
   maxAge: 86400, // 24 hours
   credentials: true,
