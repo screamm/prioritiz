@@ -3,6 +3,10 @@ const allowedOrigins = [
   'http://localhost:4173',
   'http://127.0.0.1:5173',
   'https://prioritiz.pages.dev',
+  'https://prioritiz.com',
+  'https://www.prioritiz.com',
+  'https://prioritz.com',
+  'https://www.prioritz.com',
 ]
 
 // Pattern to match Cloudflare Pages preview deployments
