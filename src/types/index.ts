@@ -165,11 +165,6 @@ export interface RestoreResponse {
   settings: Partial<Settings>
 }
 
-export interface EmailRequest {
-  email: string
-  token: string
-}
-
 export interface ApiError {
   error: string
   code?: string

@@ -96,9 +96,3 @@ export function formatDate(timestamp: number): string {
   })
 }
 
-/**
- * Validate email format
- */
-export function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-}

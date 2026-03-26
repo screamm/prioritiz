@@ -1,11 +1,10 @@
 import { useState } from 'react'
-import { Copy, Check, Mail, QrCode, RefreshCw, AlertTriangle, Clock, CloudOff } from 'lucide-react'
+import { Copy, Check, QrCode, RefreshCw, AlertTriangle, Clock, CloudOff } from 'lucide-react'
 import { useSettingsStore } from '@/stores'
 import { toast } from '@/stores/toastStore'
 import { copyToClipboard } from '@/utils'
 import { Button } from '@/components/ui'
 import { QRCodeModal } from './QRCodeModal'
-import { EmailModal } from './EmailModal'
 import { TOKEN_EXPIRATION_DAYS } from '@/types'
 
 export function TokenDisplay() {
@@ -18,7 +17,6 @@ export function TokenDisplay() {
   } = useSettingsStore()
   const [copied, setCopied] = useState(false)
   const [qrModalOpen, setQrModalOpen] = useState(false)
-  const [emailModalOpen, setEmailModalOpen] = useState(false)
 
   const tokenStatus = getTokenStatus()
   const daysRemaining = getDaysRemaining()
@@ -180,15 +178,6 @@ export function TokenDisplay() {
             Visa QR-kod
           </Button>
           <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setEmailModalOpen(true)}
-            disabled={tokenStatus === 'expired'}
-          >
-            <Mail className="mr-2 h-4 w-4" />
-            Skicka via e-post
-          </Button>
-          <Button
             variant={tokenStatus === 'expired' || tokenStatus === 'expiring' ? 'primary' : 'ghost'}
             size="sm"
             onClick={handleRegenerateToken}
@@ -208,11 +197,6 @@ export function TokenDisplay() {
       <QRCodeModal
         isOpen={qrModalOpen}
         onClose={() => setQrModalOpen(false)}
-        token={token}
-      />
-      <EmailModal
-        isOpen={emailModalOpen}
-        onClose={() => setEmailModalOpen(false)}
         token={token}
       />
     </>

@@ -411,13 +411,16 @@ syncRoute.post('/', zValidator('json', syncSchema), async (c) => {
     console.error('[SYNC] Error name:', error instanceof Error ? error.name : 'Unknown')
     console.error('[SYNC] Error message:', error instanceof Error ? error.message : String(error))
 
-    // Return more specific error message in development
-    const errorMessage = error instanceof Error ? error.message : 'Unknown database error'
+    // Only expose internal error details in development
+    const errorMessage =
+      c.env.ENVIRONMENT === 'development' && error instanceof Error
+        ? error.message
+        : 'Failed to sync data. Please try again.'
 
     return errorResponse(
       c,
       ErrorCodes.DATABASE_ERROR,
-      `Database error: ${errorMessage}`,
+      errorMessage,
       500
     )
   }

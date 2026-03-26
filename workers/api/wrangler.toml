@@ -20,11 +20,8 @@ ENVIRONMENT = "production"
 ALLOWED_ORIGINS = "https://prioritiz.pages.dev,http://localhost:5173"
 
 # Rate limiting configuration
-# Note: Actual rate limiting is implemented in middleware
-
-# Secrets (set via wrangler secret put):
-# - MAILGUN_API_KEY
-# - MAILGUN_DOMAIN
+# Note: Current rate limiting is in-memory per Worker instance.
+# For distributed rate limiting across CF edge nodes, migrate to Durable Objects.
 
 # Production environment
 [env.production]

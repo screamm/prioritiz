@@ -1,4 +1,4 @@
-import type { SyncRequest, SyncResponse, RestoreResponse, EmailRequest, ApiError } from '@/types'
+import type { SyncRequest, SyncResponse, RestoreResponse, ApiError } from '@/types'
 import { API_URL } from '@/utils/constants'
 
 /**
@@ -199,15 +199,8 @@ class ApiClient {
     return this.request<RestoreResponse>(`/restore/${token}`)
   }
 
-  async sendEmail(data: EmailRequest): Promise<{ success: boolean }> {
-    return this.request<{ success: boolean }>('/email', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }
-
-  async health(): Promise<{ status: string; timestamp: number }> {
-    return this.request<{ status: string; timestamp: number }>('/health')
+  async health(): Promise<{ status: string }> {
+    return this.request<{ status: string }>('/health')
   }
 }
 

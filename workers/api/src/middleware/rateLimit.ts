@@ -6,47 +6,71 @@ interface RateLimitEntry {
   resetAt: number
 }
 
-// In-memory store for rate limiting
-// Note: In a production environment with multiple Workers instances,
-// consider using Cloudflare KV or Durable Objects for distributed rate limiting
-const rateLimitStore = new Map<string, RateLimitEntry>()
+// Separate in-memory stores per limit tier
+// Note: Each CF Workers instance has its own store — this is per-instance limiting.
+// For true distributed rate limiting, migrate to Cloudflare Durable Objects or KV.
+const globalStore = new Map<string, RateLimitEntry>()
+const sensitiveStore = new Map<string, RateLimitEntry>()
 
-// Rate limit configuration
-const WINDOW_MS = 60 * 1000 // 1 minute window
-const MAX_REQUESTS = 30 // 30 requests per minute
+// Global limit: 30 req/min per IP
+const GLOBAL_WINDOW_MS = 60 * 1000
+const GLOBAL_MAX = 30
 
-// Cleanup old entries periodically to prevent memory leaks
-const CLEANUP_INTERVAL = 5 * 60 * 1000 // 5 minutes
+// Sensitive endpoint limit: 5 req/min per IP (restore — brute force protection)
+const SENSITIVE_WINDOW_MS = 60 * 1000
+const SENSITIVE_MAX = 5
+
+const CLEANUP_INTERVAL = 5 * 60 * 1000
 let lastCleanup = Date.now()
+
+// Paths that use the tighter sensitive limit
+const SENSITIVE_PATH_PATTERN = /^\/restore\//
 
 function cleanupExpiredEntries(): void {
   const now = Date.now()
-  for (const [ip, entry] of rateLimitStore.entries()) {
-    if (entry.resetAt < now) {
-      rateLimitStore.delete(ip)
-    }
+  for (const [ip, entry] of globalStore.entries()) {
+    if (entry.resetAt < now) globalStore.delete(ip)
+  }
+  for (const [ip, entry] of sensitiveStore.entries()) {
+    if (entry.resetAt < now) sensitiveStore.delete(ip)
   }
 }
 
 function getClientIP(c: Context<{ Bindings: Bindings }>): string {
-  // Cloudflare provides the real client IP in this header
   const cfConnectingIp = c.req.header('cf-connecting-ip')
-  if (cfConnectingIp) {
-    return cfConnectingIp
-  }
+  if (cfConnectingIp) return cfConnectingIp
 
-  // Fallback headers for local development
   const xForwardedFor = c.req.header('x-forwarded-for')
-  if (xForwardedFor) {
-    return xForwardedFor.split(',')[0].trim()
-  }
+  if (xForwardedFor) return xForwardedFor.split(',')[0].trim()
 
   const xRealIp = c.req.header('x-real-ip')
-  if (xRealIp) {
-    return xRealIp
-  }
+  if (xRealIp) return xRealIp
 
   return 'unknown'
+}
+
+function checkLimit(
+  store: Map<string, RateLimitEntry>,
+  key: string,
+  max: number,
+  windowMs: number,
+  now: number
+): { allowed: boolean; remaining: number; resetAt: number } {
+  let entry = store.get(key)
+
+  if (!entry || entry.resetAt < now) {
+    entry = { count: 1, resetAt: now + windowMs }
+    store.set(key, entry)
+  } else {
+    entry.count++
+  }
+
+  const remaining = Math.max(0, max - entry.count)
+  return {
+    allowed: entry.count <= max,
+    remaining,
+    resetAt: entry.resetAt,
+  }
 }
 
 export async function rateLimiter(
@@ -55,53 +79,58 @@ export async function rateLimiter(
 ): Promise<Response | void> {
   const now = Date.now()
 
-  // Periodic cleanup
   if (now - lastCleanup > CLEANUP_INTERVAL) {
     cleanupExpiredEntries()
     lastCleanup = now
   }
 
-  const ip = getClientIP(c)
-
-  // Skip rate limiting for health checks
+  // Health checks bypass rate limiting
   if (c.req.path === '/health') {
     return next()
   }
 
-  let entry = rateLimitStore.get(ip)
+  const ip = getClientIP(c)
+  const isSensitivePath = SENSITIVE_PATH_PATTERN.test(c.req.path)
 
-  if (!entry || entry.resetAt < now) {
-    // Create new entry or reset expired one
-    entry = {
-      count: 1,
-      resetAt: now + WINDOW_MS,
-    }
-    rateLimitStore.set(ip, entry)
-  } else {
-    // Increment counter
-    entry.count++
-  }
+  // Always apply global limit
+  const global = checkLimit(globalStore, ip, GLOBAL_MAX, GLOBAL_WINDOW_MS, now)
 
-  // Calculate remaining requests
-  const remaining = Math.max(0, MAX_REQUESTS - entry.count)
-  const resetInSeconds = Math.ceil((entry.resetAt - now) / 1000)
+  c.header('X-RateLimit-Limit', GLOBAL_MAX.toString())
+  c.header('X-RateLimit-Remaining', global.remaining.toString())
+  c.header('X-RateLimit-Reset', Math.ceil(global.resetAt / 1000).toString())
 
-  // Set rate limit headers
-  c.header('X-RateLimit-Limit', MAX_REQUESTS.toString())
-  c.header('X-RateLimit-Remaining', remaining.toString())
-  c.header('X-RateLimit-Reset', Math.ceil(entry.resetAt / 1000).toString())
-
-  // Check if rate limit exceeded
-  if (entry.count > MAX_REQUESTS) {
+  if (!global.allowed) {
+    const retryAfter = Math.ceil((global.resetAt - now) / 1000)
     return c.json(
       {
         error: 'Too Many Requests',
         code: 'RATE_LIMITED',
-        message: `Rate limit exceeded. Please try again in ${resetInSeconds} seconds.`,
-        retryAfter: resetInSeconds,
+        message: `Rate limit exceeded. Please try again in ${retryAfter} seconds.`,
+        retryAfter,
       },
       429
     )
+  }
+
+  // Apply tighter limit on sensitive paths (restore brute-force protection)
+  if (isSensitivePath) {
+    const sensitive = checkLimit(sensitiveStore, ip, SENSITIVE_MAX, SENSITIVE_WINDOW_MS, now)
+
+    if (!sensitive.allowed) {
+      const retryAfter = Math.ceil((sensitive.resetAt - now) / 1000)
+      c.header('X-RateLimit-Limit', SENSITIVE_MAX.toString())
+      c.header('X-RateLimit-Remaining', '0')
+      c.header('X-RateLimit-Reset', Math.ceil(sensitive.resetAt / 1000).toString())
+      return c.json(
+        {
+          error: 'Too Many Requests',
+          code: 'RATE_LIMITED',
+          message: `Rate limit exceeded. Please try again in ${retryAfter} seconds.`,
+          retryAfter,
+        },
+        429
+      )
+    }
   }
 
   return next()

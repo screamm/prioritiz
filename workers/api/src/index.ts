@@ -2,7 +2,6 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { syncRoute } from './routes/sync'
 import { restoreRoute } from './routes/restore'
-import { emailRoute } from './routes/email'
 import { healthRoute } from './routes/health'
 import { rateLimiter } from './middleware/rateLimit'
 import { corsConfig } from './middleware/cors'
@@ -11,8 +10,6 @@ import { handleScheduled } from './scheduled'
 
 export type Bindings = {
   DB: D1Database
-  MAILGUN_API_KEY: string
-  MAILGUN_DOMAIN: string
   ENVIRONMENT: string
 }
 
@@ -27,7 +24,6 @@ app.use('*', rateLimiter)
 // Mount routes
 app.route('/sync', syncRoute)
 app.route('/restore', restoreRoute)
-app.route('/email', emailRoute)
 app.route('/health', healthRoute)
 
 // Root endpoint
@@ -36,7 +32,7 @@ app.get('/', (c) => {
     name: 'Prioritiz API',
     version: '1.0.0',
     status: 'running',
-    endpoints: ['/health', '/sync', '/restore/:token', '/email'],
+    endpoints: ['/health', '/sync', '/restore/:token'],
   })
 })
 

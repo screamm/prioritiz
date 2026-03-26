@@ -27,7 +27,7 @@ export async function securityHeaders(c: Context, next: Next): Promise<void> {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self'",
-      "connect-src 'self' https://*.pages.dev",
+      "connect-src 'self' https://prioritiz.pages.dev https://prioritiz-api.davidrydgren.workers.dev",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",

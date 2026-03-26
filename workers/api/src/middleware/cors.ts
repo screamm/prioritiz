@@ -10,9 +10,10 @@ const pagesDevPattern = /^https:\/\/[a-z0-9-]+\.prioritiz\.pages\.dev$/
 
 export const corsConfig = {
   origin: (origin: string | undefined) => {
-    // Allow requests with no origin (like mobile apps or curl)
+    // Requests without an Origin header (e.g. curl, Postman) are not browser-initiated
+    // cross-origin requests — deny CORS access rather than granting wildcard
     if (!origin) {
-      return '*'
+      return null
     }
 
     // Check against allowed list
@@ -29,8 +30,8 @@ export const corsConfig = {
     return null
   },
   allowMethods: ['GET', 'POST', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'X-Token', 'Authorization', 'X-Request-ID'],
-  exposeHeaders: ['X-Request-Id', 'X-RateLimit-Remaining'],
+  allowHeaders: ['Content-Type', 'X-Request-ID'],
+  exposeHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
   maxAge: 86400, // 24 hours
   credentials: true,
 }
