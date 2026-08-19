@@ -26,9 +26,27 @@ ALLOWED_ORIGINS = "https://prioritiz.pages.dev,http://localhost:5173"
 # Production environment
 [env.production]
 name = "prioritiz-api"
+# workers_dev must be explicit: wrangler defaults it to false for an
+# environment that defines `routes`, which silently disabled the
+# prioritiz-api.davidrydgren.workers.dev subdomain the frontend actually
+# talks to (src/utils/constants.ts API_URL) the moment `routes` was added
+# below. The api.prioritiz.pages.dev custom domain route does not actually
+# work — *.pages.dev resolves to Cloudflare Pages' own routing, not to an
+# arbitrary Worker custom domain — so workers.dev is the only route that
+# currently serves real traffic; keep it explicitly on.
+workers_dev = true
 routes = [
   { pattern = "api.prioritiz.pages.dev", custom_domain = true }
 ]
+
+# Bindings are NOT inherited from the top-level config by environments in
+# wrangler.toml — they must be repeated here, or a `--env production` deploy
+# ships a worker with no database access at all (confirmed live: this was
+# missing and the deployed worker's /health check returned "degraded").
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "prioritiz-db"
+database_id = "c86396ce-ed2d-4929-b21b-39ddeacce558"
 
 [env.production.vars]
 ENVIRONMENT = "production"
@@ -37,6 +55,11 @@ ALLOWED_ORIGINS = "https://prioritiz.pages.dev"
 # Staging environment
 [env.staging]
 name = "prioritiz-api-staging"
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "prioritiz-db"
+database_id = "c86396ce-ed2d-4929-b21b-39ddeacce558"
 
 [env.staging.vars]
 ENVIRONMENT = "staging"

@@ -86,7 +86,20 @@ Detta kräver ingen millisekund-precision — bara "två flikar, en av dem rörd
 3. Synlig utgångsvarning (banner, inte bara Settings) + förnya klockan även vid appöppning (fynd 6, 7).
 4. Resten (5, 8, 9, 10) är verkliga men mindre akuta — värda att åtgärda i nästa iteration.
 
-Inget av ovanstående har fixats i denna audit — detta är enbart en kartläggning. Säg till om du vill att jag börjar med punkt 1.
+**Status: Punkt 1 och 2 (kritiska fynd 1, 2, 3) är åtgärdade och deployade 2026-08-19** — se commit "Fix 3 critical data-loss risks from data integrity audit". Punkt 3 och resten är fortfarande öppna.
+
+### Genomförda fixar (2026-08-19)
+
+- **Fynd 1 & 2 (restore utan bekräftelse / falsk framgång vid tomt konto):** `syncService.restore()` returnerar nu `needs_confirmation` istället för att skriva över lokal data direkt när enheten redan har todos/prioriteringar — alla tre ingångar (Settings, välkomstmodal, `/restore/:token`) visar en `ConfirmModal` med antal (lokalt vs. i koden) innan något skrivs över. Ett återställt konto med noll poster rapporteras nu som `empty` istället för en falsk framgångstoast.
+- **Fynd 3 (cross-tab lastSyncAt-desync):** Backend (`workers/api/src/routes/sync.ts`) raderar inte längre poster baserat på frånvaro i payloaden om `lastSyncAt` saknas — det är den säkra defaulten istället för den tidigare "radera om osäker". Frontend (`settingsStore.ts`) uppdaterar nu en flik som redan har token med det senaste `lastSyncAt`-värdet från systerflikar, inte bara vid första hämtningen. Verifierat live mot produktions-API:t med ett testtoken: en "stale tab"-sync med `lastSyncAt: null` och en post som saknades i payloaden **behöll** posten (tidigare hade den raderats).
+
+### Bonusfynd under deploy: trasig produktionsinfrastruktur (ej relaterat till audit-fynden, men allvarligt)
+
+Vid deploy av worker-fixen upptäcktes och åtgärdades ett **oberoende, redan existerande fel** i `workers/api/wrangler.toml`:
+- `[env.production]` saknade en egen `[[d1_databases]]`-bindning. Wrangler-miljöer ärver INTE bindningar från toppnivån — resultatet blev att workern efter en `--env production`-deploy helt saknade databasåtkomst (`/health` svarade `"degraded"`). Fixat genom att lägga till bindningen explicit för både `env.production` och `env.staging`.
+- `[env.production]` hade en `routes`-konfiguration utan explicit `workers_dev = true`. Wrangler stänger då av `*.workers.dev`-subdomänen som default — vilket är den URL frontend faktiskt pratar med (`API_URL` i `src/utils/constants.ts`). Den konfigurerade custom domain-routen (`api.prioritiz.pages.dev`) fungerar dessutom inte alls (`*.pages.dev` är Cloudflare Pages eget reserverade namnrymd, går inte att peka en Worker-route dit på det sättet). Detta innebar att **den riktiga produktions-API:et blev otillgängligt** under en period av denna session. Fixat genom att explicit sätta `workers_dev = true`. Verifierat återställt via faktisk webbläsare (inte bara curl, eftersom `*.workers.dev` har bot-skydd som kan blockera automatiserade requests separat).
+
+Ingen användardata gick förlorad av detta — det var ett tillfälligt avbrott i API-tillgängligheten under själva deploy-arbetet, inte en radering. Men värt att känna till: kontot har också redan **5 cron triggers** (Cloudflare Free-gränsen), vilket gör att framtida `wrangler deploy` av denna worker kommer fortsätta visa ett (ofarligt) fel om att cron-schemat inte kunde uppdateras — det befintliga schemat (`0 3 * * *`) påverkas inte av detta, men om schemat någonsin behöver ändras krävs antingen en uppgradering till Workers Paid eller att ta bort en cron trigger från något annat projekt på kontot.
 
 ---
 
