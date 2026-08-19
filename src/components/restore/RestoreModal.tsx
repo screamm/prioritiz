@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Loader2, KeyRound } from 'lucide-react'
-import { Modal, Button } from '@/components/ui'
+import { Modal, Button, ConfirmModal } from '@/components/ui'
 import { toast } from '@/stores/toastStore'
 import { syncService } from '@/services'
 
@@ -24,6 +24,13 @@ interface RestoreModalProps {
 
 export function RestoreModal({ isOpen, onClose, onSuccess }: RestoreModalProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const [confirmState, setConfirmState] = useState<{
+    token: string
+    localTodosCount: number
+    localPrioritiesCount: number
+    remoteTodosCount: number
+    remotePrioritiesCount: number
+  } | null>(null)
 
   const {
     register,
@@ -51,13 +58,17 @@ export function RestoreModal({ isOpen, onClose, onSuccess }: RestoreModalProps) 
     setIsLoading(true)
 
     try {
-      const success = await syncService.restore(data.token)
+      const result = await syncService.restore(data.token)
 
-      if (success) {
+      if (result.status === 'needs_confirmation') {
+        setConfirmState({ token: data.token, ...result })
+      } else if (result.status === 'success') {
         toast.success('Din lista har återställts!')
         reset()
         onClose()
         onSuccess?.()
+      } else if (result.status === 'empty') {
+        toast.info('Den koden har ingen sparad data.')
       } else {
         toast.error('Ingen data hittades för denna kod')
       }
@@ -65,6 +76,31 @@ export function RestoreModal({ isOpen, onClose, onSuccess }: RestoreModalProps) 
       toast.error('Kunde inte återställa. Försök igen.')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleConfirmedRestore = async () => {
+    if (!confirmState) return
+
+    setIsLoading(true)
+    try {
+      const result = await syncService.restore(confirmState.token, { force: true })
+
+      if (result.status === 'success') {
+        toast.success('Din lista har återställts!')
+        reset()
+        onClose()
+        onSuccess?.()
+      } else if (result.status === 'empty') {
+        toast.info('Den koden har ingen sparad data.')
+      } else if (result.status === 'error') {
+        toast.error('Ingen data hittades för denna kod')
+      }
+    } catch {
+      toast.error('Kunde inte återställa. Försök igen.')
+    } finally {
+      setIsLoading(false)
+      setConfirmState(null)
     }
   }
 
@@ -112,6 +148,22 @@ export function RestoreModal({ isOpen, onClose, onSuccess }: RestoreModalProps) 
           </Button>
         </div>
       </form>
+
+      <ConfirmModal
+        isOpen={confirmState !== null}
+        onClose={() => setConfirmState(null)}
+        onConfirm={handleConfirmedRestore}
+        title="Ersätta din nuvarande lista?"
+        message={
+          confirmState
+            ? `Du har just nu ${confirmState.localTodosCount} uppgifter och ${confirmState.localPrioritiesCount} prioriteringar sparade lokalt. Den här koden innehåller ${confirmState.remoteTodosCount} uppgifter och ${confirmState.remotePrioritiesCount} prioriteringar. Om du fortsätter ersätts din nuvarande lista helt – detta går inte att ångra.`
+            : ''
+        }
+        confirmText="Ersätt min lista"
+        cancelText="Avbryt"
+        variant="warning"
+        isLoading={isLoading}
+      />
     </Modal>
   )
 }

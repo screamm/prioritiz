@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { Download, Loader2 } from 'lucide-react'
-import { Button, Input } from '@/components/ui'
+import { Button, Input, ConfirmModal } from '@/components/ui'
 import { syncService } from '@/services/sync'
 import { toast } from '@/stores/toastStore'
 import { cn } from '@/utils'
@@ -8,6 +8,12 @@ import { cn } from '@/utils'
 export function RestoreToken() {
   const [restoreCode, setRestoreCode] = useState('')
   const [isRestoring, setIsRestoring] = useState(false)
+  const [confirmState, setConfirmState] = useState<{
+    localTodosCount: number
+    localPrioritiesCount: number
+    remoteTodosCount: number
+    remotePrioritiesCount: number
+  } | null>(null)
 
   // Format input as XXX-XXX-XXX
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -29,26 +35,52 @@ export function RestoreToken() {
 
   const isValidCode = restoreCode.length === 11 && /^[A-Z0-9]{3}-[A-Z0-9]{3}-[A-Z0-9]{3}$/.test(restoreCode)
 
+  const applyRestoreResult = useCallback((result: Awaited<ReturnType<typeof syncService.restore>>) => {
+    if (result.status === 'success') {
+      toast.success('Data återställd! Dina todos och prioriteringar har laddats.')
+      setRestoreCode('')
+    } else if (result.status === 'empty') {
+      toast.info('Den koden har ingen sparad data. Din nuvarande lista har inte ändrats.')
+      setRestoreCode('')
+    } else if (result.status === 'error') {
+      toast.error('Kunde inte återställa data. Kontrollera koden och försök igen.')
+    }
+  }, [])
+
   const handleRestore = useCallback(async () => {
     if (!isValidCode || isRestoring) return
 
     setIsRestoring(true)
 
     try {
-      const success = await syncService.restore(restoreCode)
+      const result = await syncService.restore(restoreCode)
 
-      if (success) {
-        toast.success('Data återställd! Dina todos och prioriteringar har laddats.')
-        setRestoreCode('')
+      if (result.status === 'needs_confirmation') {
+        setConfirmState(result)
       } else {
-        toast.error('Kunde inte återställa data. Kontrollera koden och försök igen.')
+        applyRestoreResult(result)
       }
-    } catch (error) {
+    } catch {
       toast.error('Ett fel uppstod vid återställning. Försök igen senare.')
     } finally {
       setIsRestoring(false)
     }
-  }, [restoreCode, isValidCode, isRestoring])
+  }, [restoreCode, isValidCode, isRestoring, applyRestoreResult])
+
+  const handleConfirmedRestore = useCallback(async () => {
+    if (!confirmState) return
+
+    setIsRestoring(true)
+    try {
+      const result = await syncService.restore(restoreCode, { force: true })
+      applyRestoreResult(result)
+    } catch {
+      toast.error('Ett fel uppstod vid återställning. Försök igen senare.')
+    } finally {
+      setIsRestoring(false)
+      setConfirmState(null)
+    }
+  }, [restoreCode, confirmState, applyRestoreResult])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && isValidCode && !isRestoring) {
@@ -92,6 +124,22 @@ export function RestoreToken() {
           Koden ska vara i formatet XXX-XXX-XXX (bokstäver och siffror)
         </p>
       )}
+
+      <ConfirmModal
+        isOpen={confirmState !== null}
+        onClose={() => setConfirmState(null)}
+        onConfirm={handleConfirmedRestore}
+        title="Ersätta din nuvarande lista?"
+        message={
+          confirmState
+            ? `Du har just nu ${confirmState.localTodosCount} uppgifter och ${confirmState.localPrioritiesCount} prioriteringar sparade lokalt. Den här koden innehåller ${confirmState.remoteTodosCount} uppgifter och ${confirmState.remotePrioritiesCount} prioriteringar. Om du fortsätter ersätts din nuvarande lista helt – detta går inte att ångra.`
+            : ''
+        }
+        confirmText="Ersätt min lista"
+        cancelText="Avbryt"
+        variant="warning"
+        isLoading={isRestoring}
+      />
     </div>
   )
 }

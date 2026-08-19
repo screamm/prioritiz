@@ -5,6 +5,7 @@ import { DndProvider } from '@/components/dnd'
 import { Inbox } from '@/components/inbox'
 import { PriorityManager } from '@/components/priority'
 import { RestoreModal } from '@/components/restore'
+import { ConfirmModal } from '@/components/ui'
 import { useTodoStore, useSettingsStore, ensureToken } from '@/stores'
 import { syncService } from '@/services'
 import { toast } from '@/stores/toastStore'
@@ -42,28 +43,89 @@ function RestorePage() {
   const { token } = useParams<{ token: string }>()
   const navigate = useNavigate()
   const [isRestoring, setIsRestoring] = useState(true)
+  const [confirmState, setConfirmState] = useState<{
+    localTodosCount: number
+    localPrioritiesCount: number
+    remoteTodosCount: number
+    remotePrioritiesCount: number
+  } | null>(null)
 
   useEffect(() => {
-    if (token) {
-      syncService.restore(token)
-        .then((success) => {
+    if (!token) return
+
+    syncService.restore(token)
+      .then((result) => {
+        if (result.status === 'needs_confirmation') {
+          // Local data exists on this device — don't auto-overwrite it.
+          // Wait for explicit confirmation instead of restoring silently.
           setIsRestoring(false)
-          if (success) {
-            toast.success('Din lista har återställts!')
-            navigate('/', { replace: true })
-          } else {
-            toast.error('Kunde inte återställa. Kontrollera koden.')
-            navigate('/', { replace: true })
-          }
-        })
-        .catch((error) => {
-          console.error('Failed to restore:', error)
-          setIsRestoring(false)
-          toast.error('Kunde inte återställa data. Kontrollera din kod och försök igen.')
-          navigate('/', { replace: true })
-        })
-    }
+          setConfirmState(result)
+          return
+        }
+
+        setIsRestoring(false)
+        if (result.status === 'success') {
+          toast.success('Din lista har återställts!')
+        } else if (result.status === 'empty') {
+          toast.info('Den koden har ingen sparad data.')
+        } else {
+          toast.error('Kunde inte återställa. Kontrollera koden.')
+        }
+        navigate('/', { replace: true })
+      })
+      .catch((error) => {
+        console.error('Failed to restore:', error)
+        setIsRestoring(false)
+        toast.error('Kunde inte återställa data. Kontrollera din kod och försök igen.')
+        navigate('/', { replace: true })
+      })
   }, [token, navigate])
+
+  const handleConfirm = async () => {
+    if (!token) return
+
+    setIsRestoring(true)
+    try {
+      const result = await syncService.restore(token, { force: true })
+      if (result.status === 'success') {
+        toast.success('Din lista har återställts!')
+      } else if (result.status === 'empty') {
+        toast.info('Den koden har ingen sparad data.')
+      } else if (result.status === 'error') {
+        toast.error('Kunde inte återställa. Kontrollera koden.')
+      }
+    } catch (error) {
+      console.error('Failed to restore:', error)
+      toast.error('Kunde inte återställa data. Kontrollera din kod och försök igen.')
+    } finally {
+      setIsRestoring(false)
+      setConfirmState(null)
+      navigate('/', { replace: true })
+    }
+  }
+
+  const handleCancel = () => {
+    setConfirmState(null)
+    navigate('/', { replace: true })
+  }
+
+  if (confirmState) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <ConfirmModal
+          isOpen
+          onClose={handleCancel}
+          onConfirm={handleConfirm}
+          title="Ersätta din nuvarande lista?"
+          message={`Du har just nu ${confirmState.localTodosCount} uppgifter och ${confirmState.localPrioritiesCount} prioriteringar sparade lokalt. Den här länken innehåller ${confirmState.remoteTodosCount} uppgifter och ${confirmState.remotePrioritiesCount} prioriteringar. Om du fortsätter ersätts din nuvarande lista helt – detta går inte att ångra.`}
+          confirmText="Ersätt min lista"
+          cancelText="Avbryt"
+          variant="warning"
+          isLoading={isRestoring}
+        />
+      </div>
+    )
+  }
 
   if (isRestoring) {
     return (

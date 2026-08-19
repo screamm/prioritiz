@@ -29,6 +29,23 @@ export type ValidatedTodo = z.infer<typeof TodoSchema>
 export type ValidatedPriority = z.infer<typeof PrioritySchema>
 
 /**
+ * Outcome of a restore() call. `needs_confirmation` means nothing was
+ * imported yet — the caller must re-call restore(token, { force: true })
+ * after the user explicitly confirms, or the local store stays untouched.
+ */
+export type RestoreResult =
+  | { status: 'success'; todosCount: number; prioritiesCount: number }
+  | { status: 'empty' }
+  | {
+      status: 'needs_confirmation'
+      localTodosCount: number
+      localPrioritiesCount: number
+      remoteTodosCount: number
+      remotePrioritiesCount: number
+    }
+  | { status: 'error'; message: string }
+
+/**
  * Sync status states
  */
 export type SyncStatusType = 'idle' | 'syncing' | 'synced' | 'failed' | 'offline'
@@ -458,9 +475,17 @@ class SyncService {
   }
 
   /**
-   * Restore data from server
+   * Restore data from server.
+   *
+   * If the current device already has local todos/priorities, this does NOT
+   * overwrite them automatically — it returns `needs_confirmation` with the
+   * local vs. remote counts so the caller can show a confirmation dialog and
+   * re-call with `{ force: true }` once the user has explicitly agreed.
+   * A remote account that turns out to have zero items is reported as
+   * `empty` rather than `success`, so callers don't show a false "restored!"
+   * message when nothing was actually restored.
    */
-  async restore(token: string): Promise<boolean> {
+  async restore(token: string, opts: { force?: boolean } = {}): Promise<RestoreResult> {
     if (!this.isOnline) {
       this.lastError = {
         message: 'Cannot restore while offline',
@@ -469,7 +494,7 @@ class SyncService {
         isRetryable: false,
       }
       this.notifyListeners()
-      return false
+      return { status: 'error', message: this.lastError.message }
     }
 
     this.setStatus('syncing')
@@ -496,6 +521,22 @@ class SyncService {
         })
       }
 
+      const localTodosCount = useTodoStore.getState().todos.length
+      const localPrioritiesCount = usePriorityStore.getState().priorities.length
+      const hasLocalData = localTodosCount > 0 || localPrioritiesCount > 0
+
+      if (hasLocalData && !opts.force) {
+        // Don't touch any store yet — let the caller confirm the overwrite first.
+        this.setStatus(this.isOnline ? 'idle' : 'offline')
+        return {
+          status: 'needs_confirmation',
+          localTodosCount,
+          localPrioritiesCount,
+          remoteTodosCount: validTodos.length,
+          remotePrioritiesCount: validPriorities.length,
+        }
+      }
+
       // Import only valid data
       useTodoStore.getState().importTodos(validTodos)
       usePriorityStore.getState().importPriorities(validPriorities)
@@ -507,13 +548,17 @@ class SyncService {
 
       this.lastError = null
       this.setStatus('synced')
-      return true
+
+      if (validTodos.length === 0 && validPriorities.length === 0) {
+        return { status: 'empty' }
+      }
+      return { status: 'success', todosCount: validTodos.length, prioritiesCount: validPriorities.length }
     } catch (error) {
       console.error('Restore error:', error)
       this.lastError = this.createSyncError(error)
       this.setStatus('failed')
       this.notifyListeners()
-      return false
+      return { status: 'error', message: this.lastError.message }
     }
   }
 

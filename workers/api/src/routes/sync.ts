@@ -201,11 +201,24 @@ syncRoute.post('/', zValidator('json', syncSchema), async (c) => {
     }
 
     // Identify records deleted on client (exist on server but not in client payload)
+    //
+    // Safety invariant: a missing/null lastSyncAt means this client has no
+    // reliable baseline of what it previously knew about (e.g. a browser tab
+    // that adopted this token before its first real sync completed, or a
+    // stale tab whose cross-tab lastSyncAt was never refreshed). Absence
+    // from the payload is only trustworthy evidence of an intentional
+    // deletion when we know the client actually saw the item before — so
+    // without a lastSyncAt we never delete, we just leave the server row
+    // alone. Deleting here previously wiped a token's entire backup whenever
+    // any client synced without a known lastSyncAt (see claudedocs/DATA_INTEGRITY_AUDIT.md).
     const prioritiesToDelete: string[] = []
     for (const serverPriority of existingPriorities) {
       if (!clientPriorityIds.has(serverPriority.id)) {
+        if (!lastSyncAt) {
+          continue
+        }
         // Check if server record was modified after last sync
-        if (lastSyncAt && serverPriority.updated_at > lastSyncAt) {
+        if (serverPriority.updated_at > lastSyncAt) {
           // Server modified after last sync but client deleted - conflict
           // For safety, we keep the server version and report conflict
           priorityConflicts.push({
@@ -230,8 +243,12 @@ syncRoute.post('/', zValidator('json', syncSchema), async (c) => {
     const todosToDelete: string[] = []
     for (const serverTodo of existingTodos) {
       if (!clientTodoIds.has(serverTodo.id)) {
+        if (!lastSyncAt) {
+          // See safety invariant above the priorities loop.
+          continue
+        }
         // Check if server record was modified after last sync
-        if (lastSyncAt && serverTodo.updated_at > lastSyncAt) {
+        if (serverTodo.updated_at > lastSyncAt) {
           // Server modified after last sync but client deleted - conflict
           todoConflicts.push({
             id: serverTodo.id,

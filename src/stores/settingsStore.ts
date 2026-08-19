@@ -251,6 +251,7 @@ if (typeof window !== 'undefined') {
       try {
         const parsed = JSON.parse(event.newValue)
         const newToken = parsed.state?.token
+        const newLastSyncAt: number | null = parsed.state?.lastSyncAt ?? null
         const currentState = useSettingsStore.getState()
 
         // If another tab set a token and we don't have one (or have a different one), sync it
@@ -258,8 +259,21 @@ if (typeof window !== 'undefined') {
           useSettingsStore.setState({
             token: newToken,
             tokenCreatedAt: parsed.state?.tokenCreatedAt,
-            lastSyncAt: parsed.state?.lastSyncAt || null,
+            lastSyncAt: newLastSyncAt,
           })
+        } else if (
+          newToken &&
+          newToken === currentState.token &&
+          newLastSyncAt !== null &&
+          (currentState.lastSyncAt === null || newLastSyncAt > currentState.lastSyncAt)
+        ) {
+          // We already hold this token, but a sibling tab has synced more
+          // recently than we have. Adopt its lastSyncAt so a tab that's been
+          // sitting idle never sends a stale/null lastSyncAt on its next
+          // sync — a stale lastSyncAt bypasses the backend's conflict
+          // protection and can cause it to delete data this tab simply
+          // never learned about (see claudedocs/DATA_INTEGRITY_AUDIT.md).
+          useSettingsStore.setState({ lastSyncAt: newLastSyncAt })
         }
       } catch {
         // Ignore parsing errors
