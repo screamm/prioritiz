@@ -67,6 +67,14 @@ function getThemePreviewGradient(theme: ThemeType): string {
       return 'linear-gradient(135deg, #0a1628 0%, #1a4a3a 50%, #2a1a4a 100%)'
     case 'ocean':
       return 'linear-gradient(135deg, #0a1a2a 0%, #0a3a5a 50%, #0a1a2a 100%)'
+    case 'midnight':
+      return 'linear-gradient(135deg, #131a2e 0%, #0a0e1a 55%, #05070d 100%)'
+    case 'graphite':
+      return 'linear-gradient(135deg, #2a2a2e 0%, #1a1a1d 55%, #0d0d0f 100%)'
+    case 'plum':
+      return 'linear-gradient(135deg, #2a1030 0%, #150a1f 55%, #08040c 100%)'
+    case 'forest':
+      return 'linear-gradient(135deg, #10251a 0%, #0a1510 55%, #050a07 100%)'
     default:
       return 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)'
   }

@@ -3,6 +3,14 @@ import type { ReactNode, ComponentType } from 'react'
 import { useSettingsStore } from '@/stores'
 import type { ThemeType } from '@/types'
 
+// Static (non-animated) gradients are imported directly, not lazy-loaded:
+// they're just a few hundred bytes of CSS, so a dynamic-import round trip
+// would only add a loading flash without any real code-splitting benefit.
+import MidnightBackground from './MidnightBackground'
+import GraphiteBackground from './GraphiteBackground'
+import PlumBackground from './PlumBackground'
+import ForestBackground from './ForestBackground'
+
 const SunsetBackground = lazy(() => import('./SunsetBackground'))
 const StarWarsBackground = lazy(() => import('./StarWarsBackground'))
 const ATATBackground = lazy(() => import('./ATATBackground'))
@@ -21,6 +29,10 @@ const backgroundComponents: Record<ThemeType, ComponentType> = {
   stars2: Stars2Background,
   aurora: AuroraBackground,
   ocean: OceanBackground,
+  midnight: MidnightBackground,
+  graphite: GraphiteBackground,
+  plum: PlumBackground,
+  forest: ForestBackground,
 }
 
 interface BackgroundProviderProps {

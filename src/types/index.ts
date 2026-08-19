@@ -85,7 +85,19 @@ export function getDaysRemaining(
 
 // === THEME ===
 
-export type ThemeType = 'sunset' | 'starwars' | 'atat' | 'starfall' | 'stars' | 'stars2' | 'aurora' | 'ocean'
+export type ThemeType =
+  | 'sunset'
+  | 'starwars'
+  | 'atat'
+  | 'starfall'
+  | 'stars'
+  | 'stars2'
+  | 'aurora'
+  | 'ocean'
+  | 'midnight'
+  | 'graphite'
+  | 'plum'
+  | 'forest'
 
 export interface ThemeConfig {
   id: ThemeType
@@ -142,6 +154,30 @@ export const THEME_CONFIGS: ThemeConfig[] = [
     name: 'Ocean',
     description: 'Djupt under havsytan',
     preview: '/themes/ocean.jpg',
+  },
+  {
+    id: 'midnight',
+    name: 'Midnight',
+    description: 'Statisk gradient — ingen animation',
+    preview: '/themes/midnight.jpg',
+  },
+  {
+    id: 'graphite',
+    name: 'Graphite',
+    description: 'Statisk gradient — ingen animation',
+    preview: '/themes/graphite.jpg',
+  },
+  {
+    id: 'plum',
+    name: 'Plum Night',
+    description: 'Statisk gradient — ingen animation',
+    preview: '/themes/plum.jpg',
+  },
+  {
+    id: 'forest',
+    name: 'Deep Forest',
+    description: 'Statisk gradient — ingen animation',
+    preview: '/themes/forest.jpg',
   },
 ]
 

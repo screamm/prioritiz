@@ -71,8 +71,8 @@ describe('types and default data', () => {
   })
 
   describe('THEME_CONFIGS', () => {
-    it('should have 7 theme configurations', () => {
-      expect(THEME_CONFIGS).toHaveLength(7)
+    it('should have 12 theme configurations', () => {
+      expect(THEME_CONFIGS).toHaveLength(12)
     })
 
     it('should include sunset theme', () => {
